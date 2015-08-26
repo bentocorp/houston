@@ -7,6 +7,7 @@ object Dispatcher {
   // Simple mock
   def assign(order: String): String = {
     val online = DriverManager.getOnline
-    online(_random.nextInt(online.length))
+    online(0)
+    //online(_random.nextInt(online.length))
   }
 }

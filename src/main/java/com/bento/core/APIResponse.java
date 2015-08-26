@@ -1,4 +1,4 @@
-package com.tagged.core;
+package com.bento.core;
 
 public class APIResponse<T> {
     public int code;

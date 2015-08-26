@@ -2,18 +2,20 @@ package com.bento
 
 import java.net.URLEncoder
 
+import com.bento.core.{WebSocketData, APIResponse}
 import com.bento.dispatch.{Dispatcher, DriverManager}
 import com.fasterxml.jackson.core.`type`.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.github.nkzawa.emitter.Emitter
 import com.github.nkzawa.emitter.Emitter.Listener
 import com.github.nkzawa.socketio.client.{Socket, IO}
-import com.tagged.core.{WebSocketData, APIResponse}
-import com.tagged.core.APIResponse.Track
+import com.tagged.core.APIResponse
+import APIResponse.Track
 import org.apache.commons.io.IOUtils
 import org.apache.http.HttpResponse
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.impl.client.HttpClientBuilder
+import org.springframework.context.annotation.PropertySource
 import org.springframework.web.bind.annotation.{RequestParam, RequestMapping, RestController}
 import com.bento.Preamble._
 
@@ -21,9 +23,9 @@ import com.bento.Preamble._
 @RequestMapping(Array("/api"))
 class HttpController {
 
-  final val CLIENT_ID = "onfleet_replacement"
-  //final val NODE_SERVER_HOST = "54.191.141.101"
-  final val NODE_SERVER_HOST = "127.0.0.1"
+  final val CLIENT_ID = "rolling01"
+  final val NODE_SERVER_HOST = "54.191.141.101"
+  //final val NODE_SERVER_HOST = "127.0.0.1"
   final val NODE_SERVER_PORT = 8081
   final val HTTP_OK = 200
 
@@ -49,6 +51,7 @@ class HttpController {
         println(s"${o.clientId} disconnected")
         DriverManager.setDriverOffline(o.clientId)
         println(s"Removed ${o.clientId} from Dispatcher queue")
+        HttpController.this.push(CLIENT_ID, """["admin01"]""", "CLIENT_OFFLINE", o.clientId)
       }
     }
   })
@@ -123,6 +126,16 @@ class HttpController {
       return "EMPTY_FLEET"
     }
     this.push(CLIENT_ID, s"""["$driver"]""", "NEW_ORDER", order)
+  }
+
+  @RequestMapping(Array("/order_accept"))
+  def orderAccept(@RequestParam("uid") uid: Long, @RequestParam("order_id") orderId: Long) = {
+
+  }
+
+  @RequestMapping(Array("/order_reject"))
+  def orderReject(@RequestParam("uid") uid: Long, @RequestParam("order_id") orderId: Long) = {
+
   }
 
 }
