@@ -1,4 +1,4 @@
-package com.bento.filter
+package org.bentocorp.filter
 
 import javax.servlet._
 import javax.servlet.http.HttpServletResponse
