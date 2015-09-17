@@ -7,6 +7,9 @@ public class APIResponse<T> {
     public int code;
     public String msg;
     public T ret;
+    public APIResponse() {
+
+    }
     public APIResponse(int code, String msg, T ret) {
         this.code = code;
         this.msg = msg;

@@ -27,7 +27,7 @@ class Dispatcher {
 
 
   // At startup, fetch all outstanding orders
-  private final val _orders = mutable.HashMap[Long, Order]()
+  private final val _orders = mutable.HashMap[Long, Order[String]]()
 
   private def _stringify(o: Object) = {
     _mapper.writeValueAsString(o)
