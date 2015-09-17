@@ -37,8 +37,8 @@ class HttpController {
   private def _conf(key: String) = E.getProperty(env + "." + key)
 
   final val CLIENT_ID = "houston01";//_conf("node.client_id")
-  //final val NODE_SERVER_HOST = "54.191.141.101"
-  final val NODE_SERVER_HOST = "127.0.0.1"
+  final val NODE_SERVER_HOST = "54.191.141.101"
+  //final val NODE_SERVER_HOST = "127.0.0.1"
   final val NODE_SERVER_PORT = 8081
   final val HTTP_OK = 200
 
