@@ -14,8 +14,10 @@ public class Push<T> {
 
     public T body;
 
-    public Push() {
+    public long timestamp;
 
+    public Push() {
+        timestamp = System.currentTimeMillis();
     }
 
     public Push(String subject, T body) {

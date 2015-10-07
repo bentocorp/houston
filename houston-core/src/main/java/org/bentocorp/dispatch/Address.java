@@ -1,32 +1,55 @@
 package org.bentocorp.dispatch;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.bentocorp.aws.Order;
+
 public class Address {
-    public String street;
-    public String residence;
-    public String city;
-    public String region;
-    public String zipCode;
-    public String country;
-    public Float lat;
-    public Float lng;
+
+    final public String street;
+
+    final public String residence;
+
+    final public String city;
+
+    final public String region; // province, state, or territory
+
+    final public String zipCode;
+
+    final public String country;
+
+    public Float lat = null;
+
+    public Float lng = null;
 
     public String formatForMapbox() {
         // 427 Stockton St, San Francisco, 94108, California, United States
         return String.join(", ", street, city, zipCode, region, country);
     }
 
-    public Address() {
-
+    public static Address parse(Order.Address address) {
+        return new Address(
+            address.number + " " + address.street,
+            null,
+            address.city,
+            address.state,
+            address.zip,
+            "United States"
+        );
     }
 
-    public Address(String street, String residence, String city, String region, String zipCode, String country) {
+    @JsonCreator
+    public Address(@JsonProperty("street")    String street,
+                   @JsonProperty("residence") String residence,
+                   @JsonProperty("city")      String city,
+                   @JsonProperty("region")    String region,
+                   @JsonProperty("zipCode")   String zipCode,
+                   @JsonProperty("country")   String country) {
         this.street = street;
         this.residence = residence;
         this.city = city;
         this.region = region;
         this.zipCode = zipCode;
         this.country = country;
-        lat = null;
-        lng = null;
     }
 }

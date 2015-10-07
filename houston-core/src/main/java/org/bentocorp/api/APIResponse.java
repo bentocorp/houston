@@ -7,14 +7,17 @@ public class APIResponse<T> {
     public int code;
     public String msg;
     public T ret;
+
     public APIResponse() {
 
     }
+
     public APIResponse(int code, String msg, T ret) {
         this.code = code;
         this.msg = msg;
         this.ret = ret;
     }
+
     public static String error(int code, String msg) throws Exception {
         return _mapper.writeValueAsString(new APIResponse<Object>(code, msg, null));
     }
