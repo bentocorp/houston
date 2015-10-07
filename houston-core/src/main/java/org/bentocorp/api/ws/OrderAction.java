@@ -2,20 +2,20 @@ package org.bentocorp.api.ws;
 
 import org.bentocorp.Order;
 
-public class OrderAction {
+public class OrderAction<T> {
 
     public static final String SUBJECT = "order_action";
 
     public enum Type {
-        CREATE, ASSIGN, REPRIORITIZE, UNASSIGN, REASSIGN, UPDATE_STATUS
+        CREATE, ASSIGN, REPRIORITIZE, UNASSIGN, REASSIGN, UPDATE_STATUS, DELETE
     }
 
     public OrderAction.Type type;
-    public Order order;
+    public Order<T> order;
     public Long driverId; // -1 if type=Type.UNASSIGN or type=Type.CREATE
-    public Long after; // -1 for insert at end
+    public String after; // null for insert at end
 
-    public static Push<OrderAction> make(OrderAction.Type type, Order order, Long driverId, Long after) {
+    public static Push<OrderAction> make(OrderAction.Type type, Order order, Long driverId, String after) {
         OrderAction action = new OrderAction();
         action.type = type;
         action.order = order;

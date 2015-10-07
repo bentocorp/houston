@@ -22,7 +22,7 @@ public class Driver {
 
     public final ReadWriteLock lock = new ReentrantReadWriteLock();
     private Status status;
-    private List<Long> orderQueue = new ArrayList<Long>();
+    private List<String> orderQueue = new ArrayList<String>();
 
     public Driver(long id, String name, String phone, Status status) {
         this.id = id;
@@ -32,9 +32,9 @@ public class Driver {
     }
 
     @JsonProperty("orderQueue")
-    public List<Long> getOrderQueue() { return new ArrayList<Long>(orderQueue); }
+    public List<String> getOrderQueue() { return new ArrayList<String>(orderQueue); }
 
-    public void setOrderQueue(List<Long> orderQueue) {
+    public void setOrderQueue(List<String> orderQueue) {
         Lock w = lock.writeLock();
         w.lock();
         try {

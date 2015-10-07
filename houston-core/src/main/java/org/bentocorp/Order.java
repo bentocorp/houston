@@ -3,6 +3,7 @@ package org.bentocorp;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.bentocorp.dispatch.Address;
 
 import java.util.List;
@@ -39,7 +40,9 @@ public class Order<T> {
         }
     }
 
-    public final long id;
+    public final String id; // b-9670 or g-5678
+    public final String orderType;
+    public final long key;
 
     public final String name;
 
@@ -58,33 +61,40 @@ public class Order<T> {
     //public int priority;
 
 
-    public static Order<List<BentoBox>> parse(org.bentocorp.aws.Order o) throws Exception {
+    public static Order<Bento> parse(org.bentocorp.aws.Order o) throws Exception {
         Address address = Address.parse(o.details.address);
         address.lat = o.details.coords.lat;
         address.lng = o.details.coords.lng;
-        return null;/*
-        return new Order<String>(
-            o.orderId,
+        Bento bentoOrder = new Bento();
+        for (BentoBox box: o.items) {
+            bentoOrder.add(box);
+        }
+        Order<Bento> order = new Order<Bento>("b-"+o.orderId, "", "", address, bentoOrder);
+        return new Order<Bento>(
+            "b-" + o.orderId,
             o.user.firstname + " " + o.user.lastname,
             o.user.phone,
             address,
-            ""
-        );*/
+            bentoOrder
+        );
     }
 
     @JsonCreator
-    public Order(@JsonProperty("id") long id,
+    public Order(@JsonProperty("id") String id,
                  @JsonProperty("name") String name,
                  @JsonProperty("phone") String phone,
                  @JsonProperty("address") Address address,
                  @JsonProperty("item") T item) throws Exception {
         // Safety check for JSON deserialization
-        if (id <= 0) {
+        if (id.isEmpty()) {
             String msg = "Invalid order ID %s - If this was thrown during JSON deserialization, check that the " +
                          "\"id\" field is present in the JSON.";
             throw new Exception(msg);
         }
         this.id = id;
+        String[] parts = id.split("-");
+        this.orderType = parts[0];
+        this.key = Long.parseLong(parts[1]);
         this.name = name;
         this.phone = phone;
         this.address = address;
@@ -93,6 +103,14 @@ public class Order<T> {
         // position may trigger a database update for every other order
         // before or after. For now, ignore.
 //        priority = 0;
+    }
+
+    public String getOrderType() {
+        return orderType;
+    }
+
+    public long getOrderKey() {
+        return key;
     }
 
     public Long getDriverId() {
@@ -144,5 +162,10 @@ public class Order<T> {
             "Order(id=%s,driverId=%s)",
             id, getDriverId()
         );
+    }
+
+    @JsonProperty("@class")
+    public String includeTypeInfo() {
+        return item.getClass().getSimpleName();
     }
 }

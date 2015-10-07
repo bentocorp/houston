@@ -1,5 +1,7 @@
 package org.bentocorp.api;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class APIResponse<T> {
@@ -24,5 +26,14 @@ public class APIResponse<T> {
 
     public static String success(Object ret) throws Exception {
         return _mapper.writeValueAsString(new APIResponse<Object>(0, "", ret));
+    }
+
+    @JsonProperty("@class")
+    public String includeTypeInfo() {
+        if (ret != null) {
+            return ret.getClass().getSimpleName();
+        } else {
+            return null;
+        }
     }
 }

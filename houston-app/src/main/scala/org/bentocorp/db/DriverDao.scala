@@ -15,11 +15,11 @@ class TDriver(tag: Tag) extends Table[(Long, Option[String], Option[String], Opt
   def lastname = column[Option[String]]("lastname")
   def mobile_phone = column[Option[String]]("mobile_phone")
   def email = column[Option[String]]("email")
-  def on_shift = column[Option[Byte]]("on_shift")
+  def status = column[Option[Byte]]("status")
   def password = column[Option[String]]("password")
   def api_token = column[Option[String]]("api_token")
   def order_queue = column[Option[String]]("order_queue")
-  def * = (pk_Driver, firstname, lastname, mobile_phone, email, on_shift, password, api_token, order_queue)
+  def * = (pk_Driver, firstname, lastname, mobile_phone, email, status, password, api_token, order_queue)
 }
 
 @Component
@@ -31,16 +31,16 @@ class DriverDao {
   val drivers = TableQuery[TDriver]
 
   def selectAll = db() withSession { implicit session =>
-    drivers.map(r => (r.pk_Driver, r.firstname, r.lastname, r.mobile_phone, r.on_shift, r.order_queue)).list
+    drivers.map(r => (r.pk_Driver, r.firstname, r.lastname, r.mobile_phone, r.status, r.order_queue)).list
   }
 
-  def updateOrderQueue(driverId: Long, queue: java.util.List[java.lang.Long]) = db() withSession { implicit session =>
+  def updateOrderQueue(driverId: Long, queue: java.util.List[String]) = db() withSession { implicit session =>
     val row = for { d <- drivers if d.pk_Driver === driverId } yield d.order_queue
     row.update(Some(queue.mkString(",")))
   }
 
   def updateStatus(driverId: Long, status: Driver.Status) = db() withSession { implicit session =>
-    val row = for { d <- drivers if d.pk_Driver === driverId } yield d.on_shift
+    val row = for { d <- drivers if d.pk_Driver === driverId } yield d.status
     row.update(Some(status.ordinal().toByte))
   }
 }

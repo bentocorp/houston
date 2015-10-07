@@ -35,7 +35,13 @@ set :deploy_to, '/sites/houston'
 # set :keep_releases, 5
 
 namespace :deploy do
-	after :finished, :start_server
+  after :finished, :cold_start do
+    on roles(:all) do |host|
+      invoke 'stop'
+      invoke 'build'
+      invoke 'start'
+    end
+  end
 
   after :restart, :clear_cache do
     on roles(:web), in: :groups, limit: 3, wait: 10 do

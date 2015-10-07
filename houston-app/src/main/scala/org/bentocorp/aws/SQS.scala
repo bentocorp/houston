@@ -2,57 +2,128 @@ package org.bentocorp.aws
 
 import javax.annotation.PostConstruct
 
-import com.amazonaws.{AmazonClientException, AmazonServiceException}
-import com.amazonaws.auth.AWSCredentials
+import com.amazonaws.{AbortedException, AmazonClientException, AmazonServiceException}
+import com.amazonaws.auth.{BasicAWSCredentials, AWSCredentials}
 import com.amazonaws.auth.profile.ProfileCredentialsProvider
 import com.amazonaws.regions.{Regions, Region}
-import com.amazonaws.services.sqs.model.{Message, ReceiveMessageRequest}
+import com.amazonaws.services.sqs.model.{DeleteMessageRequest, Message, ReceiveMessageRequest}
 import com.amazonaws.services.sqs.{AmazonSQSClient, AmazonSQS}
+import com.fasterxml.jackson.core.`type`.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import org.bentocorp.Preamble.Http
+import org.bentocorp.api.APIResponse
+import org.bentocorp.api.ws.OrderAction
 
-import org.bentocorp.aws
+import org.bentocorp.{HttpController, Config, JSON, aws}
 import org.bentocorp.dispatch.{OrderManager, Address}
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.autoconfigure.AutoConfigureBefore
 import org.springframework.stereotype.Component
 import scala.collection.JavaConversions._
 
-@Component
-class SQS {
+object SQS {
+
+  final val Logger = LoggerFactory.getLogger(SQS.getClass)
+
+  @volatile var service: SQS = null
+
+  def start(controller: HttpController) {
+    if (service != null) {
+      throw new Exception("Error in execution flow! Trying to Amazon SQS Service when not null")
+    }
+    service = new SQS(controller)
+    service.start()
+  }
+
+  def stop() {
+    service.safeStop()
+    service = null
+  }
+}
+
+class SQS(controller: HttpController) extends Thread {
+
+  final val Logger = LoggerFactory.getLogger(classOf[SQS])
 
   final val VISIBILITY_TIMEOUT = 30 // seconds
 
-  @Autowired
-  val orderManager: OrderManager = null
+  val orderManager: OrderManager = controller.orderManager
 
   val mapper = new ObjectMapper().registerModule(DefaultScalaModule)
 
-  //@PostConstruct
-  def start() {
+  var sqs: AmazonSQS = null
+  var request: ReceiveMessageRequest = null
+
+  val url = "https://sqs.us-west-2.amazonaws.com/457902237154/bento-dev-orders"
+
+  var config: Config = controller.config
+
+    val credentials: AWSCredentials = new BasicAWSCredentials(
+      config().getString("aws.id"), config().getString("aws.secret"))
+    sqs = new AmazonSQSClient(credentials)
+    val usWest2: Region = Region.getRegion(Regions.US_WEST_2)
+    sqs.setRegion(usWest2)
+
+    request = new ReceiveMessageRequest(url)
+    request.setMaxNumberOfMessages(1)
+    request.setVisibilityTimeout(VISIBILITY_TIMEOUT)
+    request.setWaitTimeSeconds(20)
+
+
+  def processOrder(): Int = {
     try {
-      val credentials: AWSCredentials = new ProfileCredentialsProvider("prod").getCredentials
-      val sqs: AmazonSQS = new AmazonSQSClient(credentials)
-      val usWest2: Region = Region.getRegion(Regions.US_WEST_2)
-      sqs.setRegion(usWest2)
-      val url = "https://sqs.us-west-2.amazonaws.com/457902237154/bento-prod-orders"
-      //while (true) {
-      val request = new ReceiveMessageRequest(url)
-      request.setMaxNumberOfMessages(1)
-      request.setVisibilityTimeout(VISIBILITY_TIMEOUT)
-      request.setWaitTimeSeconds(20)
       val messages: java.util.List[Message] = sqs.receiveMessage(request).getMessages
+      if (Thread.interrupted()) {
+        return 0
+      }
       for (m: Message <- messages) {
-        println("received a message!")
         val body = mapper.readValue(m.getBody, classOf[MessageBody])
         val awsOrder = mapper.readValue(body.data, classOf[Order])
         val order = org.bentocorp.Order.parse(awsOrder)
-        println(body.data)
-        //order.item = orderManager.stringifyItems(awsOrder.items)
+        Logger.debug(">>>>>> got " + order.id)
+        orderManager.orders += (order.getOrderKey -> order)
+        val p = OrderAction.make(OrderAction.Type.CREATE, order, -1L, null).from("houston").toRecipient("a-11")
+        val str = Http.get("http://%s:%s/api/push" format (config().getString("node.host"), config().getString("node.port")), "rid" -> p.rid, "from" -> p.from, "to" -> p.to, "subject" -> p.subject,
+          "body" -> JSON.serialize(p.body), "token" -> token)
+        JSON.deserialize(str, new TypeReference[APIResponse[String]]() { })
+
+        val messageReceiptHandle = m.getReceiptHandle()
+        sqs.deleteMessage(new DeleteMessageRequest()
+          .withQueueUrl(url)
+          .withReceiptHandle(messageReceiptHandle))
+        // TODO - if send not successful do not delete message from SQS!!
+
+
       }
-      //}
+      messages.size()
     } catch {
-      case e: Exception => e.printStackTrace()
+      case abortedException: AbortedException =>
+        // Thrown when an API is invoked while Thread.interrupt is set
+       println("Interrupted!")
+      0
     }
+
+  }
+
+  val token = controller.token
+
+  @volatile var continue = false
+
+  override def run() {
+    Logger.info("Starting Amazon SQS Service")
+    continue = true
+    while (continue) {
+      Logger.debug("Fetching data from queue")
+      // May block for up to 20 seconds
+      processOrder()
+    }
+    Logger.info("Amazon SQS Service stopped")
+  }
+
+  def safeStop() {
+    Logger.info("Stopping Amazon SQS service (may take up to 20 seconds)")
+    continue = false
   }
 }

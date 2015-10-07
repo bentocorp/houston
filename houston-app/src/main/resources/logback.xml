@@ -9,7 +9,7 @@
     </appender>
 
     <appender name="file-audit" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>debug.log</file>
+        <file>/sites/houston/current/debug.log</file>
         <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
             <Pattern>
                 %d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n
@@ -27,7 +27,7 @@
     </appender>
 
     <appender name="file-error" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>error.log</file>
+        <file>/sites/houston/current/error.log</file>
         <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
             <Pattern>
                 %d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n

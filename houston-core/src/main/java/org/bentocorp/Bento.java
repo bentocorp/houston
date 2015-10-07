@@ -3,17 +3,17 @@ package org.bentocorp;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Bento {
+public class Bento extends ArrayList<BentoBox> {
 
-    public final List<BentoBox> bentoBoxes = new ArrayList<BentoBox>();
-
-    public Bento() { }
+    public Bento() {
+        super();
+    }
 
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder("");
-        for (int i = 0; i < bentoBoxes.size(); i++) {
-            List<BentoBox.Item> items = bentoBoxes.get(i).items;
+        for (int i = 0; i < this.size(); i++) {
+            List<BentoBox.Item> items = this.get(i).items;
             builder.append(String.format(
                 "Bento Box %s\n" +
                 "-----------\n" +

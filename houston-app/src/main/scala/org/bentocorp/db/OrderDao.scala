@@ -31,14 +31,14 @@ class OrderDao {
   final val Logger = LoggerFactory.getLogger(classOf[OrderDao])
 
   @Autowired
-  var db: Database = null
+  var database: Database = null
 
   val order = TableQuery[TOrder]
   val customerBentoBox = TableQuery[TCustomerBentoBox]
   val user = TableQuery[TUser]
   val status = TableQuery[TOrderStatus]
 
-  def selectAll(day: Timestamp) = db() withSession { implicit session =>
+  def selectAll(day: Timestamp) = database() withSession { implicit session =>
     val res =
       for {
         o <- order
@@ -69,45 +69,55 @@ class OrderDao {
     res.list
   }
 
-  def updateStatus(orderId: Long, orderStatus: Order.Status): Int = db() withSession { implicit session =>
+  def updateStatus(orderId: Long, orderStatus: Order.Status): Int = database() withSession { implicit session =>
     val row = for { s <- status if s.fk_Order === orderId } yield s.status
     row.update(Some(orderStatus.toString))
   }
 
-  @throws(classOf[Exception])
-  def assignTransaction(orderId: Long, orderStatus: org.bentocorp.Order.Status, assignedDriverId: java.lang.Long, driverId: Long, orderQueue: String) = {
+  // Transaction to assign/unassign Bento orders to drivers
+  def assignOrderTransaction(args: Database.Map, status: Order.Status) {
     var con: Connection = null
     try {
-      con = db.getDataSource.getConnection
+      // Try to obtain a connection from the pool
+      con = database.getDataSource.getConnection
+      // Turn off auto-commit to start a transaction
       con.setAutoCommit(false)
-      // To minimize deadlock, we need to enforce a natural ordering on the resources we want to lock (in this case,
-      // the database columns) - order, currently assigned driver, newly assigned driver (if any)
-      // TODO - Do we have an index on fk_Order for OrderStatus?
+      // To mitigate deadlocks, we must enforce a natural ordering on the resources we need to obtain - in this case,
+      // the database columns we want to modify.
       con.prepareStatement(
-        "SELECT `status`, fk_Driver, order_queue FROM OrderStatus, Driver WHERE fk_Order=%s AND pk_Driver=%s FOR UPDATE;"
-        format (orderId, driverId)
+        "SELECT `status`, `fk_Driver` FROM `OrderStatus` WHERE `fk_Order`=%s FOR UPDATE;" format args[Long]("pk_Order")
       ).execute()
-      // Perform updates
+      con.prepareStatement(
+        "SELECT `order_queue` FROM `Driver` WHERE `pk_Driver`=%s FOR UPDATE;" format args[Long]("pk_Driver")
+      ).execute()
+      // If status is Order.Status.ASSIGNED, the order will also be assigned to the driver
+      val driverId = status match {
+        case Order.Status.PENDING => args[Long]("pk_Driver")
+        case Order.Status.UNASSIGNED => -1L
+        case Order.Status.CANCELLED => -1L
+        case _ => throw new Exception("Error - assignOrderTransaction - Unsupported order status " + status)
+      }
+      // Update SQL statements
       val sqls = Array(
-        "UPDATE OrderStatus SET `status`='%s', fk_Driver=%s WHERE fk_Order=%s;" format (orderStatus.toString, assignedDriverId, orderId),
-        "UPDATE Driver SET order_queue='%s' WHERE pk_Driver=%s;" format (orderQueue, driverId)
+        "UPDATE `OrderStatus` SET `status`='%s', `fk_Driver`=%s WHERE `fk_Order`=%s" format (status.toString, driverId, args[Long]("pk_Order")),
+        "UPDATE `Driver` SET `order_queue`='%s' WHERE `pk_Driver`=%s" format (args[String]("order_queue"), args[Long]("pk_Driver"))
       )
       sqls foreach { sql =>
-        println(sql)
         val rowsAffected = con.prepareStatement(sql).executeUpdate()
         if (rowsAffected <= 0) {
           throw new Exception("Error - rows affected = %s for statement %s" format (rowsAffected, sql))
         }
       }
-      // TODO - Do all locks get released after committing, or only rows that have been updated?
       con.commit()
     } catch {
       case e: Exception =>
-        Logger.error("Error executing assign transaction - rolling back")
-        e.printStackTrace() // Configure to print to error logs?
+        val stackTrace = Thread.currentThread.getStackTrace
+        Logger.error("Error - assignOrderTransaction - " + e.getMessage, stackTrace)
+        // If we encounter an error, rollback all changes
         con.rollback()
         throw e
     } finally {
+      // Important that we release all resources
       if (con != null) con.close()
     }
   }

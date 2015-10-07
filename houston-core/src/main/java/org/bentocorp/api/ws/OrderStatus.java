@@ -5,14 +5,14 @@ import org.bentocorp.Order;
 public class OrderStatus {
     public static final String SUBJECT = "order_status";
 
-    public long orderId;
+    public String orderId;
     public Order.Status status;
 
     public OrderStatus() {
 
     }
 
-    public static Push<OrderStatus> make(long orderId, Order.Status status) {
+    public static Push<OrderStatus> make(String orderId, Order.Status status) {
         OrderStatus p = new OrderStatus();
         p.orderId = orderId;
         p.status = status;

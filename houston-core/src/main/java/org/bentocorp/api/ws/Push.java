@@ -1,5 +1,7 @@
 package org.bentocorp.api.ws;
 
+import org.bentocorp.JSON;
+
 public class Push<T> {
     // This is an optional request identifier provided by the client and returned by the server so that the client can
     // identify which push notifications correspond to which GET requests
@@ -30,8 +32,19 @@ public class Push<T> {
         return this;
     }
 
-    public Push to(String recipient) {
-        to = recipient;
+    public Push toRecipient(String recipient) {
+        // TODO - Must investigate how URL strings are interpreted as JSON >:@
+        to = "[\""+recipient+"\"]";
+        return this;
+    }
+
+    public Push toGroup(String group) {
+        to = group;
+        return this;
+    }
+
+    public Push toAll() {
+        to = "*";
         return this;
     }
 

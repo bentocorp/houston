@@ -13,6 +13,7 @@ public class BentoBox {
 
     public List<Item> items = new ArrayList<Item>();
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Item {
 
         public enum Temp {
@@ -47,7 +48,7 @@ public class BentoBox {
             public static Type parse(String value) throws Exception {
                 Type[] values = Type.values();
                 for (Type T: values) {
-                    if (T.value.equals(value)) {
+                    if (value.indexOf(T.value) == 0) {
                         return T;
                     }
                 }

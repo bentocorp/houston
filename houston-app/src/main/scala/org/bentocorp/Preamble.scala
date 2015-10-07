@@ -13,22 +13,35 @@ object Preamble {
 
     final val Logger = LoggerFactory.getLogger(Http.getClass)
 
-    final val HTTP_OK = 200
-
-    private val _client = HttpClientBuilder.create().build()
+    private val client = HttpClientBuilder.create().build()
 
     def get(url: String, params: (String, Any)*): String = {
-      val queryString = params.map(_ match {
+      val queryString = (params map {
         case (key, value) => key + "=" + URLEncoder.encode(value.toString, "UTF-8")
       }).mkString("&")
-      val res = _client.execute(new HttpGet(url + "?" + queryString))
+      //Logger.debug(url + "?" + queryString)
+      val res = client.execute(new HttpGet(url + "?" + queryString))
       val statusCode = res.getStatusLine.getStatusCode
-      if (statusCode != HTTP_OK) {
-        Logger.error("")
+      if (statusCode != 200) {
+        val stackTrace = Thread.currentThread.getStackTrace
+        Logger.error("Error - %s?%s failed with status code %s" format (url, queryString, statusCode), stackTrace)
         null
       } else {
         IOUtils.toString(res.getEntity.getContent)
       }
     }
+  }
+
+  def normalize_phone(phone: String, ccIso: String = "US") = {
+    var res = phone.replaceAll("\\(|\\)|\\-|\\s", "")
+    if ("US".equals(ccIso)) {
+      if (res.charAt(0) != '+') {
+        if (res.length <= 10) {
+          res = "1" + res
+        }
+        res = "+" + res
+      }
+    }
+    res
   }
 }
