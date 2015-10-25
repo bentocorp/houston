@@ -32,7 +32,10 @@ object Preamble {
     }
   }
 
-  def normalize_phone(phone: String, ccIso: String = "US") = {
+  def normalize_phone(phone: String, ccIso: String = "US"): String = {
+    if(phone.isEmpty) {
+      return ""
+    }
     var res = phone.replaceAll("\\(|\\)|\\-|\\s", "")
     if ("US".equals(ccIso)) {
       if (res.charAt(0) != '+') {

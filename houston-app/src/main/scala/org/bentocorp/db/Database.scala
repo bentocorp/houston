@@ -4,7 +4,7 @@ import java.sql.{Statement, Connection, ResultSet}
 import javax.annotation.PostConstruct
 
 import com.mysql.jdbc.jdbc2.optional.MysqlDataSource
-import org.bentocorp.Config
+import org.bentocorp.BentoConfig
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
@@ -41,7 +41,7 @@ class Database {
   final val Logger = LoggerFactory.getLogger(classOf[Database])
 
   @Autowired
-  val config: Config = null
+  val config: BentoConfig = null
 
   var database: slick.driver.MySQLDriver.simple.Database = null
 
@@ -50,13 +50,13 @@ class Database {
   @PostConstruct
   def init() {
     Logger.debug("Attempting to connect to database")
-    database = slick.driver.MySQLDriver.simple.Database.forConfig("mysql", config())
+    database = slick.driver.MySQLDriver.simple.Database.forConfig("mysql", config.toTypesafeConfig)
 
     Logger.debug("Instantiating a data source")
     ds = new MysqlDataSource
-    ds.setURL(config().getString("mysql.url"))
-    ds.setUser(config().getString("mysql.user"))
-    ds.setPassword(config().getString("mysql.password"))
+    ds.setURL(config.getString("mysql.url"))
+    ds.setUser(config.getString("mysql.user"))
+    ds.setPassword(config.getString("mysql.password"))
   }
 
   def apply() = database

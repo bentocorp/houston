@@ -1,8 +1,10 @@
 package org.bentocorp.dispatch
 
+import java.util.{TimeZone, Calendar}
 import javax.annotation.PostConstruct
 
 import org.bentocorp.db.DriverDao
+import org.bentocorp.redis.{RMap, Redis}
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
@@ -15,18 +17,36 @@ class DriverManager {
   @Autowired
   var driverDao: DriverDao = null
 
-  import scala.collection.mutable
-  // Initialize from database
-  val drivers = mutable.Map.empty[Long, Driver]
+  @Autowired
+  var redis: Redis = null
+
+  var drivers: RMap[Long, Driver] = null
 
   import org.bentocorp.Preamble._
+
   @PostConstruct
   def init() {
-    Logger.info("Initializing drivers from database")
-    driverDao.selectAll foreach {
-      case (pk, Some(firstname), Some(lastname), Some(phone), Some(onshift), queueStr) =>
+    drivers = redis.getMap[Long, Driver]("drivers")
+    // Load data into redis if we are the first thread to reach here
+    val calendar = Calendar.getInstance(TimeZone.getTimeZone("PST"))
+    calendar.set(Calendar.HOUR_OF_DAY, 0)
+    calendar.set(Calendar.MINUTE, 0)
+    calendar.set(Calendar.SECOND, 0)
+    calendar.set(Calendar.MILLISECOND, 0)
+    redis.race("DriverManager#init_" + calendar.getTimeInMillis, () => {
+      syncDrivers()
+    })
+  }
+
+  import scala.collection.mutable.{Map => MMap}
+
+  def syncDrivers() {
+    Logger.info("Fetching drivers from database")
+    val drivers = MMap.empty[Long, Driver]
+    driverDao.selectAllActive foreach {
+      case (pk, Some(firstname), Some(lastname), Some(phone), statusByte, queueStr) =>
         val normalizedPhone = normalize_phone(phone)
-        val status = if (onshift.toInt > 0) Driver.Status.ONLINE else Driver.Status.OFFLINE
+        val status = if (statusByte > 0) Driver.Status.ONLINE else Driver.Status.OFFLINE
         val driver = new Driver(pk, firstname + " " + lastname, normalizedPhone, status)
         queueStr match {
           case Some(str) =>
@@ -40,6 +60,8 @@ class DriverManager {
       case row =>
         throw new Exception("Bad driver row - " + row)
     }
+    Logger.info("Processed %s driver(s)" format drivers.size)
+    redis.setMap("drivers", drivers)
   }
 
   @throws(classOf[Exception])
@@ -53,11 +75,18 @@ class DriverManager {
   @throws(classOf[Exception])
   def setStatus(driverId: Long, status: Driver.Status) {
     val driver = getDriver(driverId)
-    // Try writing to database first
-    if (driverDao.updateStatus(driverId, status) > 0) {
-      drivers(driverId).setStatus(status)
-    } else {
-      throw new Exception("Error updating driver status in database")
+    try {
+      redis.lock(driver.getLockId)
+      // Try writing to database first
+      if (driverDao.updateStatus(driverId, status) > 0) {
+        driver.setStatus(status)
+        // Then if successful, set to cache
+        drivers += (driver.id -> driver)
+      } else {
+        throw new Exception("Error updating driver status in database")
+      }
+    } finally {
+      redis.unlock(driver.getLockId)
     }
   }
 
@@ -66,7 +95,7 @@ class DriverManager {
   def removeOrder(driverId: Long, orderId: String) {
     val driver = getDriver(driverId)
     try {
-      driver.lock.writeLock().lock()
+      redis.lock(driver.getLockId)
       val orderQueue = driver.getOrderQueue
       if (!orderQueue.remove(orderId)) {
         throw new Exception("Error - Order %s not in order queue for driver %s" format (orderId, driverId))
@@ -75,8 +104,10 @@ class DriverManager {
       driverDao.updateOrderQueue(driver.id, orderQueue)
       // Then update everything else
       driver.setOrderQueue(orderQueue)
+      // Set to cache
+      drivers += (driver.id -> driver)
     } finally {
-      driver.lock.writeLock().unlock()
+      redis.unlock(driver.getLockId)
     }
   }
 }

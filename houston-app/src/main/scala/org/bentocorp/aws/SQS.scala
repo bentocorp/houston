@@ -15,7 +15,7 @@ import org.bentocorp.Preamble.Http
 import org.bentocorp.api.APIResponse
 import org.bentocorp.api.ws.OrderAction
 
-import org.bentocorp.{HttpController, Config, JSON, aws}
+import org.bentocorp._
 import org.bentocorp.dispatch.{OrderManager, Address}
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -56,12 +56,12 @@ class SQS(controller: HttpController) extends Thread {
   var sqs: AmazonSQS = null
   var request: ReceiveMessageRequest = null
 
-  val url = "https://sqs.us-west-2.amazonaws.com/457902237154/bento-dev-orders"
 
-  var config: Config = controller.config
 
+  var config: BentoConfig = controller.config
+  val url = config.getString("aws.sqs.url")
     val credentials: AWSCredentials = new BasicAWSCredentials(
-      config().getString("aws.id"), config().getString("aws.secret"))
+      config.getString("aws.id"), config.getString("aws.secret"))
     sqs = new AmazonSQSClient(credentials)
     val usWest2: Region = Region.getRegion(Regions.US_WEST_2)
     sqs.setRegion(usWest2)
@@ -83,11 +83,18 @@ class SQS(controller: HttpController) extends Thread {
         val awsOrder = mapper.readValue(body.data, classOf[Order])
         val order = org.bentocorp.Order.parse(awsOrder)
         Logger.debug(">>>>>> got " + order.id)
-        orderManager.orders += (order.getOrderKey -> order)
-        val p = OrderAction.make(OrderAction.Type.CREATE, order, -1L, null).from("houston").toRecipient("a-11")
-        val str = Http.get("http://%s:%s/api/push" format (config().getString("node.host"), config().getString("node.port")), "rid" -> p.rid, "from" -> p.from, "to" -> p.to, "subject" -> p.subject,
-          "body" -> JSON.serialize(p.body), "token" -> token)
-        JSON.deserialize(str, new TypeReference[APIResponse[String]]() { })
+
+        if (!orderManager.orders.contains(order.getOrderKey)) {
+          orderManager.orders += (order.getOrderKey -> order)
+          val p = OrderAction.make(OrderAction.Type.CREATE, order, -1L, null).from("houston").toGroup("atlas")
+          val str = Http.get("http://%s:%s/api/push" format (config.getString("node.host"), config.getString("node.port")), "rid" -> p.rid, "from" -> p.from, "to" -> p.to, "subject" -> p.subject,
+            "body" -> ScalaJson.stringify(p.body), "token" -> token)
+          val res: APIResponse[String] = ScalaJson.parse(str, new TypeReference[APIResponse[String]]() { })
+          if (res.code != 0) {
+            Logger.error("Error sending SQS order to Atlas - " + res.msg)
+          }
+        }
+
 
         val messageReceiptHandle = m.getReceiptHandle()
         sqs.deleteMessage(new DeleteMessageRequest()

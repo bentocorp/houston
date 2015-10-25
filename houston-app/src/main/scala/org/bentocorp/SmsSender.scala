@@ -15,15 +15,15 @@ import org.springframework.stereotype.Component
 class SmsSender {
   final val Logger = LoggerFactory.getLogger(classOf[SmsSender])
   @Autowired
-  var config: Config = null
+  var config: BentoConfig = null
 
   var twilio: TwilioRestClient = null
   var account: Account = null
 
   @PostConstruct
   def init() {
-    val sid = config().getString("twilio.sid")
-    val authToken = config().getString("twilio.token")
+    val sid = config.getString("twilio.sid")
+    val authToken = config.getString("twilio.token")
     twilio = new TwilioRestClient(sid, authToken)
     account = twilio.getAccount
   }

@@ -1,5 +1,6 @@
 package org.bentocorp.dispatch;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.commons.lang3.StringUtils;
 
@@ -20,7 +21,7 @@ public class Driver {
     public final String name;
     public final String phone;
 
-    public final ReadWriteLock lock = new ReentrantReadWriteLock();
+//    public final ReadWriteLock lock = new ReentrantReadWriteLock();
     private Status status;
     private List<String> orderQueue = new ArrayList<String>();
 
@@ -35,26 +36,26 @@ public class Driver {
     public List<String> getOrderQueue() { return new ArrayList<String>(orderQueue); }
 
     public void setOrderQueue(List<String> orderQueue) {
-        Lock w = lock.writeLock();
-        w.lock();
-        try {
+//        Lock w = lock.writeLock();
+//        w.lock();
+//        try {
             this.orderQueue = orderQueue;
-        } finally {
-            w.unlock();
-        }
+//        } finally {
+//            w.unlock();
+//        }
     }
 
     @JsonProperty("status")
     public Status getStatus() { return status; }
 
     public void setStatus(Status status) {
-        Lock w = lock.writeLock();
-        w.lock();
-        try {
+//        Lock w = lock.writeLock();
+//        w.lock();
+//        try {
             this.status = status;
-        } finally {
-            w.unlock();
-        }
+//        } finally {
+//            w.unlock();
+//        }
     }
 
     @Override
@@ -64,5 +65,11 @@ public class Driver {
             id,
             StringUtils.join(orderQueue, ",")
         );
+    }
+
+    @JsonIgnore
+    public String getLockId() {
+        // redis-driver#678
+        return "redis-driver#" + id;
     }
 }

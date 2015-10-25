@@ -38,14 +38,17 @@ class OrderDao {
   val user = TableQuery[TUser]
   val status = TableQuery[TOrderStatus]
 
-  def selectAll(day: Timestamp) = database() withSession { implicit session =>
+  // Select all "active" orders & all "closed" orders after <param>day</param>
+  // TODO note - very inefficient! make sure we come back to address this
+  def select(day: Timestamp) = database() withSession { implicit session =>
     val res =
       for {
         o <- order
         b <- customerBentoBox
         u <- user
         s <- status
-        if o.pk_Order === b.fk_Order && o.fk_User === u.pk_User && o.pk_Order === s.fk_Order && o.created_at >= day
+        if o.pk_Order === b.fk_Order && o.fk_User === u.pk_User && o.pk_Order === s.fk_Order &&
+          ((s.status =!= Order.Status.CANCELLED.toString && s.status =!= Order.Status.COMPLETE.toString) || o.created_at >= day)
       } yield {(
         o.pk_Order,
         u.firstname,

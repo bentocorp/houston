@@ -1,5 +1,7 @@
 package org.bentocorp;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+
 import java.util.ArrayList;
 import java.util.List;
 

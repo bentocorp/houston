@@ -9,8 +9,8 @@ end
 desc "Start Houston"
 task :start do
 	on roles(:all) do |host|
-		execute "nohup java -jar -Dserver.port=8081 #{fetch(:deploy_to)}/current/houston-app/target/houston-app-0.1.0.jar --env=#{fetch(:stage)} >/dev/null 2>&1 &"
-		#execute "java -jar -Dserver.port=8081 #{fetch(:deploy_to)}/current/houston-app/target/houston-app-0.1.0.jar --env=#{fetch(:stage)}"
+		execute "nohup java -jar -Dserver.port=8081 #{fetch(:deploy_to)}/current/houston-app/target/houston-app-0.1.0.jar --env=#{fetch(:stage)} --flush-redis >/dev/null 2>&1 &"
+		#execute "java -jar -Dserver.port=8081 #{fetch(:deploy_to)}/current/houston-app/target/houston-app-0.1.0.jar --env=#{fetch(:stage)} --flush-redis"
 	end
 end
 

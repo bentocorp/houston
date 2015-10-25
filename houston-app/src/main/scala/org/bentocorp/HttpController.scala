@@ -1,11 +1,8 @@
 package org.bentocorp
 
-import java.net.URLEncoder
 import javax.annotation.PostConstruct
 
 import com.fasterxml.jackson.core.`type`.TypeReference
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.github.nkzawa.emitter.Emitter.Listener
 import com.github.nkzawa.socketio.client.{Ack, Socket, IO}
 import org.bentocorp.Preamble.Http
@@ -14,6 +11,7 @@ import org.bentocorp.api.ws.{Stat, OrderStatus, Push, OrderAction}
 import org.bentocorp.aws.SQS
 import org.bentocorp.db.{Database, GenericOrderDao}
 import org.bentocorp.dispatch._
+import org.bentocorp.redis.Redis
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.{Value, Autowired}
 import org.springframework.context.annotation.{Configuration, PropertySource}
@@ -30,7 +28,7 @@ class HttpController {
   final val Logger = LoggerFactory.getLogger(classOf[HttpController])
 
   @Autowired
-  var config: Config = null
+  var config: BentoConfig = null
 
   @Autowired
   var driverManager: DriverManager = null
@@ -40,18 +38,19 @@ class HttpController {
 
   final val HTTP_OK = 200
 
-  JSON.registerModule(DefaultScalaModule)
-
-  def str(obj: Object) = JSON.serialize(obj)
+  def str(obj: Object) = ScalaJson.stringify(obj)
 
   private var socket: Socket = _
   var token = ""
 
   final var NODE_URL = ""
 
+  @Autowired
+  var phpService: PhpService = null
+
   @PostConstruct
   def init() {
-    NODE_URL = "http://%s:%s" format (config().getString("node.host"), config().getString("node.port"))
+    NODE_URL = "http://%s:%s" format (config.getString("node.host"), config.getString("node.port"))
     socket = {
       val opts = new IO.Options
       val url = NODE_URL
@@ -59,19 +58,21 @@ class HttpController {
     }
     socket.on(Socket.EVENT_CONNECT, new Listener {
       override def call(args: Object*) {
-        println("Connected to Node server")
-        val username = config().getString("node.username")
-        val password = config().getString("node.password")
-        println("Authenticating as %s" format username)
+        Logger.info("Connected to Node server")
+        val username = config.getString("node.username")
+        val password = config.getString("node.password")
+        Logger.info("Authenticating as %s" format username)
         socket.emit("get", "/api/authenticate?username=%s&password=%s&type=system" format (username, password), new Ack() {
           override def call(args: Object*) {
-            val res: APIResponse[Authenticate] = JSON.deserialize(args(0).toString, new TypeReference[APIResponse[Authenticate]]() { })
+            val res: APIResponse[Authenticate] = ScalaJson.parse(args(0).toString, new TypeReference[APIResponse[Authenticate]]() { })
             if (res.code != 0) {
-              println("Error authenticating - " + res.msg)
+              Logger.info("Error authenticating - " + res.msg)
             } else {
-              println("Successfully authenticated")
+              Logger.info("Successfully authenticated")
               token = res.ret.token
-              driverManager.drivers.values foreach { d => track(d.id) }
+              Logger.debug("received access token " + token)
+              val drivers = driverManager.drivers.toMap
+              drivers.values foreach { d => track(d.id) }
               SQS.start(HttpController.this)
             }
           }
@@ -83,7 +84,7 @@ class HttpController {
       override def call(args: Object*) {
         Logger.debug("stat - " + args(0))
         // Node server will write to this channel as clients connect / disconnect
-        val obj = JSON.deserialize(args(0).asInstanceOf[String], classOf[Stat])
+        val obj = ScalaJson.parse(args(0).asInstanceOf[String], classOf[Stat])
         val parts = obj.clientId.split("-")
         parts(0) match {
           case "d" =>
@@ -109,52 +110,53 @@ class HttpController {
       }
     })
 
-    println("Attempting to connect to Node server")
+    socket.on(Socket.EVENT_CONNECT_TIMEOUT, new Listener {
+      override def call(args: Object*) {
+        Logger.error("Error - EVENT_CONNECT_TIMEOUT")
+      }
+    })
+
+    socket.on(Socket.EVENT_CONNECT_ERROR, new Listener {
+      override def call(args: Object*) {
+        Logger.error("Error - EVENT_CONNECT_ERROR")
+      }
+    })
+
+    socket.on(Socket.EVENT_RECONNECT_ERROR, new Listener {
+      override def call(args: Object*) {
+        Logger.error("Error - EVENT_RECONNECT_ERROR")
+      }
+    })
+
+    Logger.info("Trying to connect to Node server")
 
     socket.connect()
   }
 
   @RequestMapping(Array("/push"))
   def send[T](p: Push[T]): APIResponse[String] = {
-    val str = Http.get("http://%s:%s/api/push" format (config().getString("node.host"), config().getString("node.port")), "rid" -> p.rid, "from" -> p.from, "to" -> p.to, "subject" -> p.subject,
-      "body" -> JSON.serialize(p.body), "token" -> token)
-    JSON.deserialize(str, new TypeReference[APIResponse[String]]() { })
+    val str = Http.get("http://%s:%s/api/push" format (config.getString("node.host"), config.getString("node.port")), "rid" -> p.rid, "from" -> p.from, "to" -> p.to, "subject" -> p.subject,
+      "body" -> ScalaJson.stringify(p.body), "token" -> token)
+    ScalaJson.parse(str, new TypeReference[APIResponse[String]]() { })
   }
-
-  /*
-  val redis = new RedisClient("localhost", 6379)
-
-  def _orderCacheKey(orderId: Long) = {
-    "order_" + orderId
-  }
-
-  def _getOrder(orderId: Long): Option[Order] = {
-    redis.get(_orderCacheKey(orderId)) match {
-      case Some(str) => Some(_mapper.readValue(str, classOf[Order]))
-      case _ => None
-    }
-  }
-
-  def _setOrder(order: Order) {
-    redis.set(_orderCacheKey(order.id), _mapper.writeValueAsString(order))
-  }
-*/
 
   /* Atlas */
 
   @RequestMapping(Array("/driver/getAll"))
   def getDrivers = {
-    success(driverManager.drivers.values.toArray)
+    success(driverManager.drivers.toMap.values.toArray)
   }
 
   @RequestMapping(Array("/order/getAll"))
   def getOrders = {
     // Important - must convert to java object for proper serialization since success() is written in java
     val orders: java.util.Map[String, Order[_]] = new java.util.HashMap[String, Order[_]]
-    orderManager.orders.values foreach { order =>
+    orderManager.orders.toMap.values foreach { order =>
+      println(order.includeTypeInfo())
       orders.put(order.id, order)
     }
-    orderManager.genericOrders.values foreach { order =>
+    orderManager.genericOrders.toMap.values foreach { order =>
+      println(order.includeTypeInfo())
       orders.put(order.id, order)
     }
     success(orders)
@@ -165,7 +167,8 @@ class HttpController {
 
   import org.bentocorp.Preamble._
   @RequestMapping(Array("/order/create"))
-  def create(@RequestParam(value = "name"   ) name   : String,
+  def create(@RequestParam(value = "token"  ) token  : String,
+             @RequestParam(value = "name"   ) name   : String,
              @RequestParam(value = "phone"  ) phone  : String,
              @RequestParam(value = "street" ) street : String,
              @RequestParam(value = "city"   ) city   : String,
@@ -177,14 +180,14 @@ class HttpController {
              @RequestParam(value = "body"   ) body   : String,
              @RequestParam(value = "driverId", defaultValue = "") driverId: String): String = {
     val order = genericOrderDao.insert(Database.Map(
-      "fk_Driver" -> (if (driverId.isEmpty) 0L else driverId.toLong), "name" -> name, "phone" -> normalize_phone(phone), "street" -> street, "city" -> city, "region" -> state,
+      "fk_Driver" -> (if (driverId.isEmpty) -1L else driverId.toLong), "name" -> name, "phone" -> normalize_phone(phone), "street" -> street, "city" -> city, "region" -> state,
       "zip_code" -> zipCode, "country" -> country, "lat" -> lat, "lng" -> lng, "body" -> body))
     orderManager.genericOrders += order.getOrderKey -> order
-    this.send(OrderAction.make(OrderAction.Type.CREATE, order, null, null).from("houston").toRecipient("a-11")) // check reponse?
+    this.send(OrderAction.make(OrderAction.Type.CREATE, order, null, null).from("houston").toGroup("atlas")) // check response?
     if (!driverId.isEmpty) {
-      orderManager.assign(order.id, driverId.toLong)
-      val push = OrderAction.make(OrderAction.Type.ASSIGN, order, driverId.toLong, null).from("houston")
-      this.send(push.toRecipient("a-11"))
+      val modifiedOrder = orderManager.assign(order.id, driverId.toLong, null, token)
+      val push = OrderAction.make(OrderAction.Type.ASSIGN, modifiedOrder, driverId.toLong, null).from("houston")
+      this.send(push.toGroup("atlas"))
       this.send(push.toRecipient("d-" + driverId))
     }
     success("OK")
@@ -199,14 +202,20 @@ class HttpController {
   }
 
   @RequestMapping(Array("/order/delete"))
-  def delete(@RequestParam(value = "orderId") orderId: String) = {
-    val order = orderManager.getOrder(orderId)
-    orderManager.delete(orderId)
-    send(OrderAction.make(OrderAction.Type.DELETE, order, -1L, null).from("houston").toRecipient("a-11"))
+  def delete(@RequestParam(value = "orderId") orderId: String, @RequestParam(value="token") token: String) = {
+    try {
+      val order = orderManager.getOrder(orderId)
+      orderManager.delete(orderId, token)
+      send(OrderAction.make(OrderAction.Type.DELETE, order, -1L, null).from("houston").toGroup("atlas"))
+      success("OK")
+    } catch {
+      case e: Exception => error(1, e.getMessage)
+    }
   }
 
   @RequestMapping(Array("/order/assign"))
-  def assign(@RequestParam(value = "rid", defaultValue = "") rid: String,
+  def assign(@RequestParam(value = "token") token: String,
+             @RequestParam(value = "rid", defaultValue = "") rid: String,
              @RequestParam(value = "orderId" ) orderId : String,
              @RequestParam(value = "driverId") driverId: java.lang.Long,
              @RequestParam(value = "afterId" ) afterId : String): String = {
@@ -217,13 +226,18 @@ class HttpController {
       }
       println("assign(%s, %s, %s, %s)" format (rid, orderId, driverId, afterId))
       val order = orderManager.getOrder(orderId)
+      println("driverId=" + order.getDriverId)
       if (driverId != null && driverId > 0 && driverManager.getDriver(driverId).getStatus != Driver.Status.ONLINE) {
         throw new Exception("Error - driver %s is not online!" format driverId)
       }
-      if (order.getDriverId == null && driverId != null && driverId > 0) {
+      val modifiedOrder: Order[_] =
+      //  TODO - driver 0 is valid now (so change to < 0)
+      if ((order.getDriverId == null || order.getDriverId <= 0) && driverId != null && driverId > 0) {
         // assign order
-        orderManager.assign(orderId, driverId, afterId)
-        send(OrderAction.make(OrderAction.Type.ASSIGN, order, driverId, afterId).from("houston").toRecipient("d-" + driverId))
+        val assignedOrder = orderManager.assign(orderId, driverId, afterId, token)
+        // XXX: TODO - Fix this so calling OrderManager#assign modifies the order object
+        send(OrderAction.make(OrderAction.Type.ASSIGN, assignedOrder, driverId, afterId).from("houston").toRecipient("d-" + driverId))
+        assignedOrder
       } else if (driverId == null || driverId < 0) {
         if (order.getDriverId == null || order.getDriverId < 0) {
           // If unassigning an unassigned order, return success right away
@@ -231,20 +245,23 @@ class HttpController {
         }
         // unassign order
         val cd = order.getDriverId
-        orderManager.unassign(orderId)
-        send(OrderAction.make(OrderAction.Type.UNASSIGN, order, null, null).from("houston").toRecipient("d-" + cd))
+        val unassignedOrder = orderManager.unassign(orderId, token)
+        send(OrderAction.make(OrderAction.Type.UNASSIGN, unassignedOrder, null, null).from("houston").toRecipient("d-" + cd))
+        unassignedOrder
       } else if (order.getDriverId == driverId) {
+        // TODO - Dragging a rejected order into the driver name should unassign then reassign (not reprioritize)
         // reprioritize
         val cd = order.getDriverId
-        orderManager.reprioritize(orderId, afterId)
+        val reprioritizedOrder = orderManager.reprioritize(orderId, afterId)
         send(OrderAction.make(OrderAction.Type.REPRIORITIZE, order, null, afterId).from("houston").toRecipient("d-" + cd))
+        reprioritizedOrder
       } else {
-        throw new Exception("Error - assign(null, %s, %s, %s) - Operation not supported" format (orderId, driverId, afterId))
+        throw new Exception("Oops assign(null, %s, %s, %s) - Operation not supported" format (orderId, driverId, afterId))
       }
       // Publish to all other atlas instances
       // TODO - OrderAction.Type doesn't matter to atlas?
 
-      val res = send(OrderAction.make(OrderAction.Type.ASSIGN, order, driverId, afterId).from("houston").toRecipient("a-11"))
+      val res = send(OrderAction.make(OrderAction.Type.ASSIGN, modifiedOrder, driverId, afterId).from("houston").toGroup("atlas"))
       if (res.code != 0) {
         Logger.debug("Warning - Failed to push order update to atlas - " + res.msg)
       }
@@ -258,12 +275,12 @@ class HttpController {
 
   @RequestMapping(Array("/test"))
   def test() {
-    send(new Push("test_subject", "Hello, World!").from("houston").toRecipient("a-11"))
+    send(new Push("test_subject", "Hello, World!").from("houston").toGroup("atlas"))
   }
 
   protected def track(driverId: Long): Driver.Status = {
     val str = Http.get(NODE_URL + "/api/track", "clientId" -> ("d-"+driverId), "token" -> token)
-    val res: APIResponse[Track] = JSON.deserialize(str, new TypeReference[APIResponse[Track]] { })
+    val res: APIResponse[Track] = ScalaJson.parse(str, new TypeReference[APIResponse[Track]] { })
     if (res.code != 0) {
       throw new Exception("Error tracking %s - %s" format (driverId, res.msg))
     } else {
@@ -303,7 +320,7 @@ class HttpController {
   def orderAccept(@RequestParam("orderId") orderId: String, @RequestParam("token") token: String) = {
     try {
       orderManager.updateStatus(orderId, Order.Status.ACCEPTED)
-      val push = OrderStatus.make(orderId, Order.Status.ACCEPTED).from("houston").toRecipient("a-11")
+      val push = OrderStatus.make(orderId, Order.Status.ACCEPTED).from("houston").toGroup("atlas")
       send(push)
       success("OK")
     } catch {
@@ -315,7 +332,7 @@ class HttpController {
   def orderReject(@RequestParam("orderId") orderId: String, @RequestParam("token") token: String) = {
     try {
       orderManager.updateStatus(orderId, Order.Status.REJECTED)
-      val push = OrderStatus.make(orderId, Order.Status.REJECTED).from("houston").toRecipient("a-11")
+      val push = OrderStatus.make(orderId, Order.Status.REJECTED).from("houston").toGroup("atlas")
       send(push)
       success("OK")
     } catch {
@@ -330,7 +347,7 @@ class HttpController {
     try {
       orderManager.updateStatus(orderId, Order.Status.COMPLETE)
       driverManager.removeOrder(driverId, orderId)
-      val push = OrderStatus.make(orderId, Order.Status.COMPLETE).from("houston").toRecipient("a-11")
+      val push = OrderStatus.make(orderId, Order.Status.COMPLETE).from("houston").toGroup("atlas")
       send(push)
       success("OK")
     } catch {
@@ -349,6 +366,72 @@ class HttpController {
       case e: Exception =>
         Logger.error(e.getMessage, e)
         error(1, e.getMessage)
+    }
+  }
+
+  @RequestMapping(Array("/sms/eta"))
+  def eta(@RequestParam("orderId") orderId: String, @RequestParam("minutes") minutes: Int) = {
+    try {
+      val order = orderManager.getOrder(orderId)
+      val firstname = order.name.split(" ")(0)
+      if (minutes <= 0) {
+        throw new Exception("Invalid minutes %s" format minutes)
+      }
+      if (firstname == null || firstname.isEmpty) {
+        throw new Exception("Invalid first name %s" format firstname)
+      }
+      val str = "Hey %s! Your Bento server is about %s minutes away. Thanks for being patient and enjoy your Bento!" format (
+        firstname,  minutes
+      )
+      Logger.info("%s -> %s" format (order.phone, str))
+      smsSender.send(order.phone, str)
+      success("OK")
+    } catch {
+      case e: Exception =>
+        Logger.error(e.getMessage, e)
+        error(1, e.getMessage)
+    }
+  }
+
+  @RequestMapping(Array("/php/assign"))
+  def phpAssign(@RequestParam("orderId")  orderId : String,
+                @RequestParam("driverId") driverId: Long,
+                @RequestParam("afterId")  afterId : String,
+                @RequestParam("token")    token   : String) = {
+    phpService.assign(orderId, driverId, afterId, token)
+  }
+
+  @Autowired
+  var redis: Redis = null
+
+  @RequestMapping(Array("/flushdb"))
+  def flushdb() = {
+    try {
+      Logger.info("Flushing redis")
+      redis.flushdb()
+      success("OK")
+    } catch {
+      case e: Exception => error(1, e.getMessage)
+    }
+  }
+
+  @RequestMapping(Array("/syncOrders"))
+  def syncOrders() = {
+    try {
+      orderManager.syncOrders()
+      success("OK")
+    } catch {
+      case e: Exception => error(1, e.getMessage)
+    }
+  }
+
+  @RequestMapping(Array("/syncDrivers"))
+  def syncDrivers() = {
+    try {
+      driverManager.syncDrivers()
+      success("OK")
+    } catch {
+      case e: Exception => error(1, e.getMessage)
     }
   }
 }

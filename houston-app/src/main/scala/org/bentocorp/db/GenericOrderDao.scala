@@ -44,8 +44,11 @@ class GenericOrderDao {
 
   val genericOrders = TableQuery[TGenericOrder]
 
+  // Select all "active" orders or all "closed" orders after <param>day</param>
+  // TODO - very inefficient; make sure we come back and address this
   def select(day: Timestamp) = database() withSession { implicit session =>
-    genericOrders.filter(_.created_at >= day).map(r => (
+    genericOrders.filter(r => (r.status =!= Order.Status.CANCELLED.toString && r.status =!= Order.Status.COMPLETE.toString) ||
+      r.created_at >= day).map(r => (
       r.pk_generic_Order,
       r.status,
       r.fk_Driver,
