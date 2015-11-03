@@ -195,12 +195,12 @@ class HttpController {
 
   @Autowired
   var smsSender: SmsSender = null
-
+/*
   @RequestMapping(Array("/sms/send"))
   def sendSms(@RequestParam("to") to: String, @RequestParam("body") body: String) {
     smsSender.send(to, body)
   }
-
+*/
   @RequestMapping(Array("/order/delete"))
   def delete(@RequestParam(value = "orderId") orderId: String, @RequestParam(value="token") token: String) = {
     try {
@@ -361,6 +361,24 @@ class HttpController {
       val order = orderManager.getOrder(orderId)
       val str = "Hey! Your Bento is here =)"
       smsSender.send(order.phone, str)
+      success("OK")
+    } catch {
+      case e: Exception =>
+        Logger.error(e.getMessage, e)
+        error(1, e.getMessage)
+    }
+  }
+
+  // TODO - Move all sms endpoints to another controller
+  @RequestMapping(Array("/sms/send"))
+  def sms(@RequestParam("orderId") orderId: String, @RequestParam("msg") msg: String) = {
+    try {
+      val order = orderManager.getOrder(orderId)
+      if (msg.isEmpty) {
+        throw new Exception("Error - You cannot send an empty SMS msg!")
+      }
+      Logger.info("%s -> %s" format (order.phone, msg))
+      smsSender.send(order.phone, msg)
       success("OK")
     } catch {
       case e: Exception =>
