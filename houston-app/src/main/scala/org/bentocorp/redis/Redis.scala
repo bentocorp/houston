@@ -14,18 +14,20 @@ import org.springframework.stereotype.Component
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable.{Map => MMap}
-import scala.reflect.ClassTag
-import scala.reflect.runtime.universe._
 
 import java.util.{List => JList}
+import java.lang.{Integer => JInt}
 
 import org.redisson.client.protocol.{RedisCommands => RedissonRedisCommands}
+
+object Redis {
+  final val DB = 8 // Use database #8
+}
 
 @Component
 class Redis {
 
   final val Logger = LoggerFactory.getLogger(classOf[Redis])
-  final val DB = 0 // Use database #7
 
   @Autowired
   var config: BentoConfig = null
@@ -45,7 +47,7 @@ class Redis {
                .setMasterAddress(master)
                .setLoadBalancer(new RandomLoadBalancer)
                .addSlaveAddress(slaves: _*)
-               //.setDatabase(DB) // Use database #7
+               .setDatabase(Redis.DB) // Use database #8
     redisson = Redisson.create(redisConfig)
     // Use low-level Redis client for everything else
     val parts: Array[String] = master.split(":")
@@ -53,7 +55,7 @@ class Redis {
     val port = parts(1).toInt
     redisClient = new RedisClient(host, port)
     if (config.getBoolean("flush-redis")) {
-      Logger.info("!!ATTENTION!! Flushing database " + DB)
+      Logger.info("!!ATTENTION!! Flushing database " + Redis.DB)
       redisson.flushdb()
     }
   }
@@ -62,6 +64,7 @@ class Redis {
 
   def race(key: String, celebrate: () => Unit) {
     val redisConnection = redisClient.connect()
+    val res0: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SELECT, new JInt(Redis.DB))
     var place: Long = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.INCR, key)
     if (place == 1) {
       // This thread is first in the race
@@ -89,7 +92,8 @@ class Redis {
   def setMap(name: String, map: MMap[_, _]) {
 //    println("Redis#setMap - %s\n%s" format (name, map))
     val redisConnection: RedisConnection = redisClient.connect()
-    var res0: String = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.MULTI)
+    var res0: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SELECT, new JInt(Redis.DB))
+    res0 = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.MULTI)
 //    println("MULTI -> " + res0)
     map foreach {
       case (key, value) =>

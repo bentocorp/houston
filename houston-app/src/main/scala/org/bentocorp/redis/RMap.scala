@@ -15,10 +15,12 @@ import scala.reflect.runtime.universe._
 import scala.collection.JavaConversions._
 
 import java.util.{List => JList}
+import java.lang.{Integer => JInt}
 
 class RMap[K: Manifest, V: Manifest](redisClient: RedisClient, name: String) {
 
   val redisConnection = redisClient.connect()
+  val res0: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SELECT, new JInt(Redis.DB))
 
   private def redisKeyMapEntry(key: String) = name + "_" + key
 
