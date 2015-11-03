@@ -81,8 +81,10 @@ class SQS(controller: HttpController) extends Thread {
       for (m: Message <- messages) {
         val body = mapper.readValue(m.getBody, classOf[MessageBody])
         val awsOrder = mapper.readValue(body.data, classOf[Order])
+        println(body.data)
         val order = org.bentocorp.Order.parse(awsOrder)
-        Logger.debug(">>>>>> got " + order.id)
+
+        Logger.debug("Got " + order.id)
 
         if (!orderManager.orders.contains(order.getOrderKey)) {
           orderManager.orders += (order.getOrderKey -> order)
@@ -91,27 +93,26 @@ class SQS(controller: HttpController) extends Thread {
             "body" -> ScalaJson.stringify(p.body), "token" -> token)
           val res: APIResponse[String] = ScalaJson.parse(str, new TypeReference[APIResponse[String]]() { })
           if (res.code != 0) {
-            Logger.error("Error sending SQS order to Atlas - " + res.msg)
+            Logger.error("Error sending SQS order to atlas group - " + res.msg)
           }
         }
 
-
-        val messageReceiptHandle = m.getReceiptHandle()
+        val messageReceiptHandle = m.getReceiptHandle
         sqs.deleteMessage(new DeleteMessageRequest()
           .withQueueUrl(url)
           .withReceiptHandle(messageReceiptHandle))
         // TODO - if send not successful do not delete message from SQS!!
-
-
       }
       messages.size()
     } catch {
       case abortedException: AbortedException =>
         // Thrown when an API is invoked while Thread.interrupt is set
-       println("Interrupted!")
-      0
+        println("Interrupted!")
+        0
+      case e: Exception =>
+        Logger.error(e.getMessage, e)
+        0
     }
-
   }
 
   val token = controller.token
