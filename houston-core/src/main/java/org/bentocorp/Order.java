@@ -50,6 +50,8 @@ public class Order<T> {
 
     public final T item;
 
+    public String orderString = "";
+
     //Irrelevant if orders are stored in distributed cache
 //    @JsonIgnore
 //    public final ReadWriteLock lock = new ReentrantReadWriteLock();
@@ -82,14 +84,15 @@ public class Order<T> {
         for (BentoBox box: o.items) {
             bentoOrder.add(box);
         }
-        Order<Bento> order = new Order<Bento>("b-"+o.orderId, "", "", address, bentoOrder);
-        return new Order<Bento>(
+        Order<Bento> order = new Order<Bento>(
             "o-" + o.orderId,
             o.user.firstname + " " + o.user.lastname,
             normalize_phone(o.user.phone),
             address,
             bentoOrder
         );
+        order.orderString = o.orderString;
+        return order;
     }
 
     @JsonCreator

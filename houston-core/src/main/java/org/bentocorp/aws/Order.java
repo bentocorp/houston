@@ -16,6 +16,9 @@ public class Order {
     @JsonProperty("OrderDetails")
     public OrderDetails details;
 
+    @JsonProperty("OrderString")
+    public String orderString;
+
     @JsonProperty("User")
     public User user;
 
