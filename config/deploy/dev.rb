@@ -30,8 +30,11 @@ role :app, %w{bento-dev-houston01}
 # For available Capistrano configuration variables see the documentation page.
 # http://capistranorb.com/documentation/getting-started/configuration/
 # Feel free to add new variables to customise your setup.
+
 require './config/myconfig.rb'
 
+# Set Branch
+set :branch, 'dev'
 
 # Custom SSH Options
 # ==================
