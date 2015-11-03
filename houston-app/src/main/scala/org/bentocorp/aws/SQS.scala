@@ -107,7 +107,7 @@ class SQS(controller: HttpController) extends Thread {
     } catch {
       case abortedException: AbortedException =>
         // Thrown when an API is invoked while Thread.interrupt is set
-        println("Interrupted!")
+        Logger.error("Interrupted!")
         0
       case e: Exception =>
         Logger.error(e.getMessage, e)

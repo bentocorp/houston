@@ -80,7 +80,7 @@ class OrderManager {
         throw new Exception("Bad dish row - Expected (id, Some(name), Some(dishType), Some(label)) but got " + row)
     }
     Logger.info("Processed %s dishes" format dishes.size)
-
+    redis.setMap("dishes", dishes)
     /* Bento orders */
 
     // Then retrieve all orders created on or after midnight of today
@@ -152,7 +152,6 @@ class OrderManager {
     }
     Logger.info("Processed %s generic order(s)" format genericOrders.size)
     // Transactionally set dishes, order, and genericOrders to distributed cache
-    redis.setMap("dishes", dishes)
     redis.setMap("orders", orders)
     redis.setMap("genericOrders", genericOrders)
   }
