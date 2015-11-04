@@ -91,9 +91,9 @@ class OrderManager {
     calendar.set(Calendar.MILLISECOND, 0)
     // Note that the returned time (in milliseconds) corresponds to UTC - or time zone 0 - which is what is configured
     // in the databases
-    val startOfToday = new Timestamp(CALENDAR.getTimeInMillis)
+    val startOfToday = new Timestamp(calendar.getTimeInMillis)
     val orders = MMap.empty[Long, Order[Bento]]
-    Logger.info("Fetching orders created on or after %s" format startOfToday)
+    Logger.info("Fetching orders created on or after %s" format DATE_FORMATTER.format(startOfToday))
     orderDao.select(startOfToday) foreach {
       case (orderId, Some(firstname), Some(lastname), Some(phone), numberOpt, Some(street), Some(city), Some(state), zipCodeOpt, Some(lat), Some(lng), Some(main), Some(side1), Some(side2), Some(side3), Some(side4), Some(statusStr), driverIdOpt) =>
         val status = Order.Status.parse(statusStr)
@@ -127,7 +127,7 @@ class OrderManager {
     /* generic orders */
 
     val genericOrders = MMap.empty[Long, Order[String]]
-    Logger.info("Fetching generic orders created on or after %s" format startOfToday)
+    Logger.info("Fetching generic orders created on or after %s" format DATE_FORMATTER.format(startOfToday))
     genericOrderDao.select(startOfToday) foreach {
       case (Some(orderId), statusStr, driverIdOpt, Some(name), Some(phone), Some(street), Some(city), Some(state), Some(zipCode), Some(country), lat, lng, Some(body)) =>
         val status = Order.Status.parse(statusStr)
