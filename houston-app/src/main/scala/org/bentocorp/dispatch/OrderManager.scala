@@ -49,8 +49,10 @@ class OrderManager {
 
   var genericOrders: RMap[Long, Order[String]] = null
 
-  final val CALENDAR = Calendar.getInstance(TimeZone.getTimeZone("PST"))
+  final val TIME_ZONE = TimeZone.getTimeZone("PST")
+  final val CALENDAR = Calendar.getInstance(TIME_ZONE)
   final val DATE_FORMATTER = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+  DATE_FORMATTER.setTimeZone(TIME_ZONE)
 
   @PostConstruct
   def init() {
