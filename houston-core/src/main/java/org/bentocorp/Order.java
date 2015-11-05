@@ -167,7 +167,7 @@ public class Order<T> {
 
     public void setDriverIdWithStatus(Long driverId, Status status) throws Exception {
         if (driverId != null && driverId >= 0 && (status == Order.Status.CANCELLED || status == Order.Status.UNASSIGNED)) {
-            String msg = String.format("Incompatible order state - driverId=%s, status=%s", driverId, status);
+            String msg = String.format("Incompatible order state - orderId=%s, driverId=%s, status=%s", id, driverId, status);
             throw new Exception(msg);
         }
 //        Lock w = lock.writeLock();

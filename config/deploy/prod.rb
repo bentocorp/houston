@@ -33,9 +33,7 @@ role :app, %w{bento-prod-houston01}
 # Feel free to add new variables to customise your setup.
 
 require './config/myconfig.rb'
-
-# Set Branch
-set :branch, 'master'
+#set :branch, 'master'
 
 # Custom SSH Options
 # ==================

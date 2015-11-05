@@ -32,9 +32,7 @@ role :app, %w{bento-dev-houston01}
 # Feel free to add new variables to customise your setup.
 
 require './config/myconfig.rb'
-
-# Set Branch
-set :branch, 'dev'
+#set :branch, 'dev'
 
 # Custom SSH Options
 # ==================
