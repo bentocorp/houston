@@ -36,17 +36,20 @@
         <version>1.2.5.RELEASE</version>
     </parent>
     -->
+
     <properties>
         <java.version>1.6</java.version>
         <scala.version>2.11.7</scala.version>
     </properties>
 
     <dependencies>
+
         <dependency>
             <groupId>org.bentocorp</groupId>
             <artifactId>houston-core</artifactId>
             <version>0.1.0</version>
         </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -59,11 +62,15 @@
             </exclusions>
         </dependency>
 
-        <!--dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-core</artifactId>
-            <version>2.6.1</version>
-        </dependency-->
+        <!--
+        If Spring Security is on the class path, the application is automatically configured with "basic" authentication
+        and authorization on all endpoints. For now, comment out so we can use our own interceptor for token validation
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+            <version>1.2.5.RELEASE</version>
+        </dependency>
+        -->
 
         <dependency>
             <groupId>com.fasterxml.jackson.module</groupId>
@@ -76,6 +83,7 @@
             <artifactId>slick_2.11</artifactId>
             <version>2.1.0</version>
         </dependency>
+
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-nop</artifactId>
@@ -106,7 +114,7 @@
             <version>3.4.5</version>
         </dependency>
 
-        <!-- socket.io dependencies -->
+        <!-- socket.io -->
 
         <dependency>
             <groupId>com.github.nkzawa</groupId>
@@ -162,19 +170,15 @@
             <version>2.1.3</version>
         </dependency>
 
-        <dependency>
-            <groupId>net.debasishg</groupId>
-            <artifactId>redisclient_2.11</artifactId>
-            <version>3.0</version>
-        </dependency>
-
         <!-- Scala -->
+
         <dependency>
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-library</artifactId>
             <version>${scala.version}</version>
             <scope>compile</scope>
         </dependency>
+
     </dependencies>
 
     <build>

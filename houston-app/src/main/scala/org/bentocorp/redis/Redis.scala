@@ -21,6 +21,7 @@ import java.lang.{Integer => JInt}
 import org.redisson.client.protocol.{RedisCommands => RedissonRedisCommands}
 
 object Redis {
+  final val AUTH_DB = 7
   final val DB = 8 // Use database #8
 }
 
@@ -71,12 +72,13 @@ class Redis {
       Logger.info("First place in %s - celebrating" format key)
       celebrate()
     } else {
-      // Otherwise, block indefinitely until the winner finishes celebrating
+      // Otherwise, block indefinitely (timeout=0) until the winner finishes celebrating
       Logger.info("Blocked at position %s in race %s" format (place, key))
       redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.BLPOP, redisKeyRaceQueue(key), new java.lang.Integer(0))
     }
     //place = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.DECR, key)
     //if (place > 0) {
+      Logger.info("Finished - passing baton for race " + key)
       // Unblock the next thread waiting in line
       redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.RPUSH, redisKeyRaceQueue(key), "OK")
     //} else {

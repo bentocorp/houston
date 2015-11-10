@@ -3,6 +3,7 @@ package org.bentocorp.db
 import java.sql.Timestamp
 
 import org.bentocorp.dispatch.Driver
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 import slick.driver.MySQLDriver.simple._
@@ -41,7 +42,9 @@ class TDriver(tag: Tag) extends Table[(Long, Option[String], Option[String], Opt
 }
 
 @Component
-class DriverDao {
+class DriverDao extends IAuthDao {
+
+  final val logger = LoggerFactory.getLogger(classOf[DriverDao])
 
   @Autowired
   var db: Database = null
@@ -62,5 +65,21 @@ class DriverDao {
   def updateStatus(driverId: Long, status: Driver.Status) = db() withSession { implicit session =>
     val row = for { d <- drivers if d.pk_Driver === driverId } yield d.status
     row.update(status.ordinal().toByte)
+  }
+
+  def getAuthenticationCredentials(username: String): (String, String) = db() withSession { implicit session =>
+    drivers.filter(_.email === username).map(row => (row.password, row.api_token)).list.head match {
+      case (Some(password), tokenOpt) => (password, tokenOpt.getOrElse(""))
+    }
+  }
+
+  def getTokenByPrimaryKey(primaryKey: Long): Option[String] = db() withSession { implicit session =>
+    val resultSet = drivers.filter(_.pk_Driver === primaryKey).map(_.api_token).list
+    if (!resultSet.isEmpty) {
+      resultSet.head
+    } else {
+      logger.error("Error - no token rows returned for primary key " + primaryKey)
+      None
+    }
   }
 }

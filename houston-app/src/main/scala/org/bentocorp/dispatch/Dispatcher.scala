@@ -1,7 +1,8 @@
 package org.bentocorp.dispatch
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.bentocorp.{HttpController, Order}
+import org.bentocorp.Order
+import org.bentocorp.controllers.HttpController
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 

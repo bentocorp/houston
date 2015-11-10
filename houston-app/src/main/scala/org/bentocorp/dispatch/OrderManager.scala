@@ -8,6 +8,7 @@ import javax.annotation.PostConstruct
 
 import org.bentocorp._
 import org.bentocorp.db._
+import org.bentocorp.filter.ResyncInterceptor
 import org.bentocorp.redis.{RMap, Redis}
 import org.redisson.Redisson
 import org.slf4j.LoggerFactory
@@ -60,11 +61,8 @@ class OrderManager {
     orders = redis.getMap[Long, Order[Bento]]("orders")
     genericOrders = redis.getMap[Long, Order[String]]("genericOrders")
     // Load data into redis if we are the first thread to reach here
-    CALENDAR.set(Calendar.HOUR_OF_DAY, 0)
-    CALENDAR.set(Calendar.MINUTE, 0)
-    CALENDAR.set(Calendar.SECOND, 0)
-    CALENDAR.set(Calendar.MILLISECOND, 0)
-    redis.race("OrderManager#init_" + CALENDAR.getTimeInMillis, () => {
+    val resyncTs = ResyncInterceptor.getClosestResyncTimeMillis(System.currentTimeMillis)
+    redis.race("OrderManager#init_" + resyncTs, () => {
       syncOrders()
     })
   }

@@ -1,25 +1,27 @@
-package org.bentocorp
+package org.bentocorp.controllers
 
 import javax.annotation.PostConstruct
 
 import com.fasterxml.jackson.core.`type`.TypeReference
 import com.github.nkzawa.emitter.Emitter.Listener
-import com.github.nkzawa.socketio.client.{Ack, Socket, IO}
+import com.github.nkzawa.socketio.client.{Ack, IO, Socket}
 import org.bentocorp.Preamble.Http
-import org.bentocorp.api.{Track, Authenticate, APIResponse}
-import org.bentocorp.api.ws.{Stat, OrderStatus, Push, OrderAction}
+import org.bentocorp._
+import org.bentocorp.api.APIResponse._
+import org.bentocorp.api.ws.{OrderAction, OrderStatus, Push, Stat}
+import org.bentocorp.api.{APIResponse, Authenticate, Track}
 import org.bentocorp.aws.SQS
 import org.bentocorp.db.{Database, GenericOrderDao}
 import org.bentocorp.dispatch._
+import org.bentocorp.mapbox.MapboxService
+import org.bentocorp.mapbox.WayPoint
 import org.bentocorp.redis.Redis
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.{Value, Autowired}
-import org.springframework.context.annotation.{Configuration, PropertySource}
-import org.springframework.core.env.Environment
-import org.springframework.web.bind.annotation.{RequestParam, RequestMapping, RestController}
-import org.bentocorp.api.APIResponse._
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.web.bind.annotation.{RequestMapping, RequestParam, RestController}
+
 import scala.collection.JavaConversions._
-import scala.collection.mutable.{ListBuffer => List, Map => Map}
+import scala.collection.mutable.{ListBuffer => List, Map}
 
 @RestController
 @RequestMapping(Array("/api"))
@@ -90,7 +92,7 @@ class HttpController {
           case "d" =>
             val driverId = parts(1).toLong
             if (obj.status.equals("connected")) {
-              println("Setting driver %s as %s" format (driverId, Driver.Status.ONLINE))
+              Logger.info("Setting driver %s as %s" format (driverId, Driver.Status.ONLINE))
               driverManager.setStatus(driverId, Driver.Status.ONLINE)
             } else if (obj.status.equals("disconnected")) {
               driverManager.setStatus(driverId, Driver.Status.OFFLINE)
@@ -104,7 +106,6 @@ class HttpController {
 
     socket.on(Socket.EVENT_DISCONNECT, new Listener {
       override def call(args: Object*) {
-        println(">> foo disconnected from server")
         Logger.info("Disconnected from Node server")
         SQS.stop()
       }
@@ -152,11 +153,9 @@ class HttpController {
     // Important - must convert to java object for proper serialization since success() is written in java
     val orders: java.util.Map[String, Order[_]] = new java.util.HashMap[String, Order[_]]
     orderManager.orders.toMap.values foreach { order =>
-      println(order.includeTypeInfo())
       orders.put(order.id, order)
     }
     orderManager.genericOrders.toMap.values foreach { order =>
-      println(order.includeTypeInfo())
       orders.put(order.id, order)
     }
     success(orders)
@@ -224,9 +223,9 @@ class HttpController {
       if ("-1".equals(afterId)) {
         return error(1, "Old order assignment format. Parameter \"afterId\" cannot be -1")
       }
-      println("assign(%s, %s, %s, %s)" format (rid, orderId, driverId, afterId))
+      Logger.debug("assign(%s, %s, %s, %s)" format (rid, orderId, driverId, afterId))
       val order = orderManager.getOrder(orderId)
-      println("driverId=" + order.getDriverId)
+      Logger.debug("driverId=" + order.getDriverId)
       if (driverId != null && driverId > 0 && driverManager.getDriver(driverId).getStatus != Driver.Status.ONLINE) {
         throw new Exception("Error - driver %s is not online!" format driverId)
       }
@@ -274,8 +273,18 @@ class HttpController {
   }
 
   @RequestMapping(Array("/test"))
-  def test() {
-    send(new Push("test_subject", "Hello, World!").from("houston").toGroup("atlas"))
+  def test(@RequestParam("orderId") orderId: String) = {
+    //send(new Push("test_subject", "Hello, World!").from("houston").toGroup("atlas"))
+    // Get driver's current location from Node
+    val order = orderManager.getOrder(orderId)
+    val res = Http.get(NODE_URL + "/api/gloc", "token"->token, "clientId" -> ("d-"+order.getDriverId))
+    val driverCurrentLoc: APIResponse[WayPoint] = ScalaJson.parse(res, new TypeReference[APIResponse[WayPoint]]() { })
+    val wayPoints: Array[WayPoint] = Array(
+      driverCurrentLoc.ret,
+      new WayPoint(order.address.lng, order.address.lat)
+    )
+    val eta = MapboxService.getEta(wayPoints)
+    eta
   }
 
   protected def track(driverId: Long): Driver.Status = {
@@ -322,6 +331,39 @@ class HttpController {
       orderManager.updateStatus(orderId, Order.Status.ACCEPTED)
       val push = OrderStatus.make(orderId, Order.Status.ACCEPTED).from("houston").toGroup("atlas")
       send(push)
+      try {
+        // Let the customer know that a driver is on the way
+        // At this point, log any Exceptions but otherwise return a successful response
+        val order = orderManager.getOrder(orderId)
+        val greeting = {
+          if (order.name != null && !order.name.isEmpty) {
+            "Hi %s,\n" format order.name.split(" ")(0)
+          } else {
+            "Hi!\n"
+          }
+        }
+        // Get driver's current location from Node
+        val res = Http.get(NODE_URL + "/api/gloc", "token"->token, "clientId" -> ("d-"+order.getDriverId))
+        val driverCurrentLoc: APIResponse[WayPoint] = ScalaJson.parse(res, new TypeReference[APIResponse[WayPoint]]() { })
+        val wayPoints: Array[WayPoint] = Array(
+          driverCurrentLoc.ret,
+          new WayPoint(order.address.lng, order.address.lat)
+        )
+        var eta = MapboxService.getEta(wayPoints)
+        Logger.info("Mapbox ETA for driver %s (%s) to order %s (%s) is %s" format (
+          order.getDriverId,
+          driverCurrentLoc.ret.toString,
+          order.id,
+          order.address.lng + "," + order.address.lat,
+          eta))
+        if (eta <= 0) {
+          eta = 30 // Default to 30 minutes
+        }
+        val msg = greeting + "Your Bento server is about %s minutes away. Thanks for being patient and enjoy your Bento!" format eta
+        smsSender.send(order.phone, msg)
+      } catch {
+        case ex: Exception => Logger.error(ex.getMessage, ex)
+      }
       success("OK")
     } catch {
       case e: Exception => error(1, e.getMessage)
@@ -398,7 +440,7 @@ class HttpController {
       if (firstname == null || firstname.isEmpty) {
         throw new Exception("Invalid first name %s" format firstname)
       }
-      val str = "Hey %s! Your Bento server is about %s minutes away. Thanks for being patient and enjoy your Bento!" format (
+      val str = "Hi %s,\nThanks for ordering Bento! Your order should arrive in about %s minutes. We'll message you once your order is on its way." format (
         firstname,  minutes
       )
       Logger.info("%s -> %s" format (order.phone, str))

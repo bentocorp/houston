@@ -33,7 +33,9 @@ class BentoConfig {
     config = defaults.getConfig(env).withFallback(defaults)
     // Option to wipe Redis instance before running the Spring application
     val flushRedis = if (springEnvironment.getProperty("flush-redis") != null) true else false
+    val noAuth = if (springEnvironment.getProperty("no-auth") != null) true else false
     config = config.withValue("flush-redis", ConfigValueFactory.fromAnyRef(flushRedis))
+                   .withValue("no-auth", ConfigValueFactory.fromAnyRef(noAuth))
                    .withValue("env", ConfigValueFactory.fromAnyRef(env))
   }
 

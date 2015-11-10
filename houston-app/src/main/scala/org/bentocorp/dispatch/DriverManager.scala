@@ -4,6 +4,7 @@ import java.util.{TimeZone, Calendar}
 import javax.annotation.PostConstruct
 
 import org.bentocorp.db.DriverDao
+import org.bentocorp.filter.ResyncInterceptor
 import org.bentocorp.redis.{RMap, Redis}
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -28,12 +29,8 @@ class DriverManager {
   def init() {
     drivers = redis.getMap[Long, Driver]("drivers")
     // Load data into redis if we are the first thread to reach here
-    val calendar = Calendar.getInstance(TimeZone.getTimeZone("PST"))
-    calendar.set(Calendar.HOUR_OF_DAY, 0)
-    calendar.set(Calendar.MINUTE, 0)
-    calendar.set(Calendar.SECOND, 0)
-    calendar.set(Calendar.MILLISECOND, 0)
-    redis.race("DriverManager#init_" + calendar.getTimeInMillis, () => {
+    val resyncTs = ResyncInterceptor.getClosestResyncTimeMillis(System.currentTimeMillis)
+    redis.race("DriverManager#init_" + resyncTs, () => {
       syncDrivers()
     })
   }

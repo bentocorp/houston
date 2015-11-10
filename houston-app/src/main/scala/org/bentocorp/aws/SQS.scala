@@ -1,10 +1,7 @@
 package org.bentocorp.aws
 
-import javax.annotation.PostConstruct
-
-import com.amazonaws.{AbortedException, AmazonClientException, AmazonServiceException}
+import com.amazonaws.AbortedException
 import com.amazonaws.auth.{BasicAWSCredentials, AWSCredentials}
-import com.amazonaws.auth.profile.ProfileCredentialsProvider
 import com.amazonaws.regions.{Regions, Region}
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, Message, ReceiveMessageRequest}
 import com.amazonaws.services.sqs.{AmazonSQSClient, AmazonSQS}
@@ -14,13 +11,10 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.bentocorp.Preamble.Http
 import org.bentocorp.api.APIResponse
 import org.bentocorp.api.ws.OrderAction
-
 import org.bentocorp._
-import org.bentocorp.dispatch.{OrderManager, Address}
+import org.bentocorp.controllers.HttpController
+import org.bentocorp.dispatch.OrderManager
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.autoconfigure.AutoConfigureBefore
-import org.springframework.stereotype.Component
 import scala.collection.JavaConversions._
 
 object SQS {
@@ -55,8 +49,6 @@ class SQS(controller: HttpController) extends Thread {
 
   var sqs: AmazonSQS = null
   var request: ReceiveMessageRequest = null
-
-
 
   var config: BentoConfig = controller.config
   val url = config.getString("aws.sqs.url")
