@@ -356,7 +356,8 @@ class HttpController {
           order.id,
           order.address.lng + "," + order.address.lat,
           eta))
-        if (eta <= 0) {
+        if (eta <= 0 || eta >= 45) {
+          Logger.debug("Warning - Mapbox ETA (%s) inaccurate?" format eta)
           eta = 30 // Default to 30 minutes
         }
         val msg = greeting + "Your Bento server is about %s minutes away. Thanks for being patient and enjoy your Bento!" format eta
