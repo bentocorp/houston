@@ -85,6 +85,8 @@ class GenericOrderDao {
     // If successful, return a new Order instance
     // TODO - implied non-nullable parameters not reflected in database schema
     val address = new Address(street.get, null, city.get, region.get, zipCode.get, country.get)
+    if (lat.isDefined) address.lat = lat.get.toFloat
+    if (lng.isDefined) address.lng = lng.get.toFloat
     val order = new Order[String]("g-" + orderId.get, name.get, phone.get, address, body.get)
     order
   }

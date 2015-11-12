@@ -260,7 +260,7 @@ class HttpController {
       // Publish to all other atlas instances
       // TODO - OrderAction.Type doesn't matter to atlas?
 
-      val res = send(OrderAction.make(OrderAction.Type.ASSIGN, modifiedOrder, driverId, afterId).from("houston").toGroup("atlas"))
+      val res = send(OrderAction.make(OrderAction.Type.ASSIGN, modifiedOrder, driverId, afterId).rid(rid).from("houston").toGroup("atlas"))
       if (res.code != 0) {
         Logger.debug("Warning - Failed to push order update to atlas - " + res.msg)
       }
@@ -328,43 +328,46 @@ class HttpController {
   @RequestMapping(Array("/order/accept"))
   def orderAccept(@RequestParam("orderId") orderId: String, @RequestParam("token") token: String) = {
     try {
+      val order = orderManager.getOrder(orderId)
       orderManager.updateStatus(orderId, Order.Status.ACCEPTED)
       val push = OrderStatus.make(orderId, Order.Status.ACCEPTED).from("houston").toGroup("atlas")
       send(push)
-      try {
-        // Let the customer know that a driver is on the way
-        // At this point, log any Exceptions but otherwise return a successful response
-        val order = orderManager.getOrder(orderId)
-        val greeting = {
-          if (order.name != null && !order.name.isEmpty) {
-            "Hi %s,\n" format order.name.split(" ")(0)
-          } else {
-            "Hi!\n"
-          }
+      // Let the customer know that a driver is on the way
+      val greeting = {
+        if (order.name != null && !order.name.isEmpty) {
+          "Hi %s,\n" format order.name.split(" ")(0)
+        } else {
+          "Hi!\n"
         }
-        // Get driver's current location from Node
-        val res = Http.get(NODE_URL + "/api/gloc", "token"->token, "clientId" -> ("d-"+order.getDriverId))
-        val driverCurrentLoc: APIResponse[WayPoint] = ScalaJson.parse(res, new TypeReference[APIResponse[WayPoint]]() { })
-        val wayPoints: Array[WayPoint] = Array(
-          driverCurrentLoc.ret,
-          new WayPoint(order.address.lng, order.address.lat)
-        )
-        var eta = MapboxService.getEta(wayPoints)
-        Logger.info("Mapbox ETA for driver %s (%s) to order %s (%s) is %s" format (
-          order.getDriverId,
-          driverCurrentLoc.ret.toString,
-          order.id,
-          order.address.lng + "," + order.address.lat,
-          eta))
-        if (eta <= 0 || eta >= 45) {
-          Logger.debug("Warning - Mapbox ETA (%s) inaccurate?" format eta)
-          eta = 30 // Default to 30 minutes
-        }
-        val msg = greeting + "Your Bento server is about %s minutes away. Thanks for being patient and enjoy your Bento!" format eta
-        smsSender.send(order.phone, msg)
-      } catch {
-        case ex: Exception => Logger.error(ex.getMessage, ex)
       }
+      val eta =
+        try {
+          // At this point, log any Exceptions but otherwise return a successful response
+          // Get driver's current location from Node
+          val res = Http.get(NODE_URL + "/api/gloc", "token"->token, "clientId" -> ("d-"+order.getDriverId))
+          val driverCurrentLoc: APIResponse[WayPoint] = ScalaJson.parse(res, new TypeReference[APIResponse[WayPoint]]() { })
+          val wayPoints: Array[WayPoint] = Array(
+            driverCurrentLoc.ret,
+            new WayPoint(order.address.lng, order.address.lat)
+          )
+          val eta = MapboxService.getEta(wayPoints)*3 // Mapbox ETA's are highly inaccurate?
+          Logger.info("Mapbox ETA for driver %s (%s) to order %s (%s) is %s" format (
+            order.getDriverId,
+            driverCurrentLoc.ret.toString,
+            order.id,
+            order.address.lng + "," + order.address.lat,
+            eta))
+          if (eta <= 0 || eta >= 45) {
+            throw new Exception("Warning - Mapbox ETA (%s) inaccurate?" format eta)
+          }
+          eta
+        } catch {
+          case ex: Exception =>
+            Logger.error(ex.getMessage, ex)
+            30 // Default to 30 minutes
+        }
+      val msg = greeting + "Your Bento server is about %s minutes away. Thanks for being patient and enjoy your Bento!" format eta
+      smsSender.send(order.phone, msg)
       success("OK")
     } catch {
       case e: Exception => error(1, e.getMessage)

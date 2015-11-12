@@ -2,7 +2,6 @@ package org.bentocorp.security
 
 import javax.annotation.PostConstruct
 
-import com.redis.RedisClient
 import org.bentocorp.db.{AdminUserDao, UserDao, DriverDao, IAuthDao}
 import org.bentocorp.redis.{RedisCommands, Redis}
 import org.redisson.client.RedisConnection
