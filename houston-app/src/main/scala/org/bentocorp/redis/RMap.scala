@@ -19,23 +19,23 @@ import java.lang.{Integer => JInt}
 
 class RMap[K: Manifest, V: Manifest](redisClient: RedisClient, name: String) {
 
-  val redisConnection = redisClient.connect()
-  val res0: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SELECT, new JInt(Redis.DB))
-
   private def redisKeyMapEntry(key: String) = name + "_" + key
 
   @throws(classOf[Exception])
   def toMap: MMap[K, V] = {
+    val redisConnection = redisClient.connect()
+    var res0: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SELECT, new JInt(Redis.DB))
     val result = MMap.empty[K, V]
     val keys: JList[String] = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SMEMBERS, name)
 //    println("RMap(%s)#toMap - %s" format (name, keys.size))
     // Since you can't operate on data obtained in the middle of a transaction, this method will throw an Exception if
     // a change in the map is detected after the key set has been retrieved
-    var res0: String = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.MULTI)
+    res0 = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.MULTI)
     for (key <- keys) {
       res0 = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.GET, redisKeyMapEntry(key))
     }
     val values: JList[String] = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.EXEC)
+    redisConnection.closeAsync() // TODO - Should be in a try/catch/finally block
 //    println("GET count(res0)=%s" format values.size)
     val k = keys.iterator
     val v = values.iterator
@@ -61,15 +61,21 @@ class RMap[K: Manifest, V: Manifest](redisClient: RedisClient, name: String) {
   }
 
   def += (keyValue: (K, V)) {
-    var res0: String = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.MULTI)
+    val redisConnection = redisClient.connect()
+    var res0: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SELECT, new JInt(Redis.DB))
+    res0 = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.MULTI)
     res0 = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.SADD, name, keyValue._1+"")
     // Internally, always store as String -> String
     res0 = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.SET, redisKeyMapEntry(keyValue._1+""), ScalaJson.stringify(keyValue._2))
     redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.EXEC)
+    redisConnection.closeAsync() // TODO - Should be in a try/catch/finally block
   }
 
   def get(key: K): Option[V] = {
+    val redisConnection = redisClient.connect()
+    var res0: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SELECT, new JInt(Redis.DB))
     val str: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.GET, redisKeyMapEntry(key + ""))
+    redisConnection.closeAsync()
     if (str == null) {
       None
     } else {
@@ -92,7 +98,10 @@ class RMap[K: Manifest, V: Manifest](redisClient: RedisClient, name: String) {
   }
 
   def apply(key: K): V = {
+    val redisConnection = redisClient.connect()
+    var res0: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SELECT, new JInt(Redis.DB))
     val str = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.GET, redisKeyMapEntry(key+""))
+    redisConnection.closeAsync()
     ScalaJson.parse(str, new TypeReference[V]() { })
   }
 
@@ -101,9 +110,12 @@ class RMap[K: Manifest, V: Manifest](redisClient: RedisClient, name: String) {
   }
 
   def remove(key: K) {
-    var res0: String = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.MULTI)
+    val redisConnection = redisClient.connect()
+    var res0: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SELECT, new JInt(Redis.DB))
+    res0 = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.MULTI)
     res0 = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.SREM, name, key+"")
     res0 = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.DEL, redisKeyMapEntry(key+""))
     val results: JList[Object] = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.EXEC)
+    redisConnection.closeAsync()
   }
 }
