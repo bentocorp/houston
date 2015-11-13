@@ -405,7 +405,7 @@ class HttpController {
   def bentoIsHere(@RequestParam("orderId") orderId: String, @RequestParam("token") token: String) = {
     try {
       val order = orderManager.getOrder(orderId)
-      val str = "Hey! Your Bento is here =)"
+      val str = "Your Bento has arrived. Look for the green flags & meet the server curbside. Thanks and enjoy your meal!"
       smsSender.send(order.phone, str)
       success("OK")
     } catch {
