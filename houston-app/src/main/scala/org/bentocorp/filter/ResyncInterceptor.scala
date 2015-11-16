@@ -73,7 +73,8 @@ class ResyncInterceptor extends HandlerInterceptorAdapter {
     // @code{lastResyncTs}
     this.synchronized {
       if (lastResyncTs != resyncTs) {
-        lastResyncTs = resyncTs
+        lastResyncTs = resyncTs // TODO - What to do with existing
+        redis.flushdb()
         logger.debug("Resyncing orders")
         redis.race("OrderManager#init_" + resyncTs, () => { orderManager.syncOrders() })
         logger.debug("Resyncing drivers")

@@ -271,6 +271,10 @@ class OrderManager {
     // First, make sure the order and driver exist
     val order = getOrder(orderId)
     val driver = driverManager.getDriver(order.getDriverId)
+    // TODO - Move into try/catch/finally block after making sure that redis.unlock() is idempotent
+    if (order.getStatus == Order.Status.COMPLETE) {
+      throw new Exception("Error - You cannot unassign a completed order")
+    }
     try {
       redis.lock(order.getLockId); redis.lock(driver.getLockId)
       val orderQueue = driver.getOrderQueue
@@ -280,17 +284,9 @@ class OrderManager {
       // Try updating database first
       order.getOrderType match {
         case "o" =>
-
           if (!phpService.assign(orderId, -1, "-1", token)) {
             throw new Exception("PHP order unassignment failed")
           }
-
-/*
-          orderDao.assignOrderTransaction(
-            Database.Map("pk_Order" -> order.getOrderKey, "pk_Driver" -> driver.id, "order_queue" -> orderQueue.mkString(",")),
-            Order.Status.UNASSIGNED
-          )
-          */
         case "g" =>
           genericOrderDao.assignOrderTransaction(
             Database.Map("pk_generic_Order" -> order.getOrderKey, "pk_Driver" -> driver.id, "order_queue" -> orderQueue.mkString(",")),
@@ -308,7 +304,11 @@ class OrderManager {
       }
       driverManager.drivers += (driver.id -> driver)
       order
+    } catch {
+      case e: Exception =>
+        throw e
     } finally {
+      // TODO - Make sure redis.unlock() is idempotent
       redis.unlock(driver.getLockId); redis.unlock(order.getLockId)
     }
   }
@@ -361,6 +361,7 @@ class OrderManager {
           if (!phpService.delete(orderId, token)) {
             throw new Exception("PHP order cancellation failed")
           }
+          orders.remove(order.getOrderKey)
           /*
           if (orderDao.updateStatus(order.getOrderKey, Order.Status.CANCELLED) > 0) {
             orders.remove(order.getOrderKey)
