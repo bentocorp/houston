@@ -2,8 +2,7 @@ package org.bentocorp.security
 
 import javax.annotation.PostConstruct
 import javax.servlet.http.{HttpServletRequest, HttpServletResponse}
-
-import org.bentocorp.BentoConfig
+import org.bentocorp.houston.config.BentoConfig
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component

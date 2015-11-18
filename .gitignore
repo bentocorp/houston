@@ -1,6 +1,11 @@
-
-
+.idea/
+archived/
+*.log
+houston.iml
 houston-app/src/main/resources/private-NO-COMMIT.conf
 houston-app/target/
+houston-app/houston-app.iml
 houston-core/target/
+houston-core/houston-core.iml
+config/myconfig.rb
 

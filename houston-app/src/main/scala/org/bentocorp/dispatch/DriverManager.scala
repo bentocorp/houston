@@ -5,6 +5,7 @@ import javax.annotation.PostConstruct
 
 import org.bentocorp.db.DriverDao
 import org.bentocorp.filter.ResyncInterceptor
+import org.bentocorp.houston.util.PhoneUtils
 import org.bentocorp.redis.{RMap, Redis}
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -23,8 +24,6 @@ class DriverManager {
 
   var drivers: RMap[Long, Driver] = null
 
-  import org.bentocorp.Preamble._
-
   @PostConstruct
   def init() {
     drivers = redis.getMap[Long, Driver]("drivers")
@@ -42,7 +41,7 @@ class DriverManager {
     val drivers = MMap.empty[Long, Driver]
     driverDao.selectAllActive foreach {
       case (pk, Some(firstname), Some(lastname), Some(phone), statusByte, queueStr) =>
-        val normalizedPhone = normalize_phone(phone)
+        val normalizedPhone = PhoneUtils.normalize_phone(phone)
         val status = if (statusByte > 0) Driver.Status.ONLINE else Driver.Status.OFFLINE
         val driver = new Driver(pk, firstname + " " + lastname, normalizedPhone, status)
         queueStr match {

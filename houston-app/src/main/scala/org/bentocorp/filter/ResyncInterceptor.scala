@@ -4,9 +4,8 @@ import java.text.SimpleDateFormat
 import java.util.{TimeZone, Calendar}
 import javax.annotation.PostConstruct
 import javax.servlet.http.{HttpServletResponse, HttpServletRequest}
-
-import org.bentocorp.BentoConfig
 import org.bentocorp.dispatch.{OrderManager, DriverManager}
+import org.bentocorp.houston.config.BentoConfig
 import org.bentocorp.redis.Redis
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired

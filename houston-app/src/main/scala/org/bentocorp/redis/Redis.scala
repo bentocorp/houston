@@ -2,7 +2,8 @@ package org.bentocorp.redis
 
 import javax.annotation.PostConstruct
 
-import org.bentocorp.{BentoConfig, ScalaJson}
+import org.bentocorp.ScalaJson
+import org.bentocorp.houston.config.BentoConfig
 import org.redisson.client.codec.StringCodec
 import org.redisson.client.protocol.decoder.StringReplayDecoder
 import org.redisson.client.{RedisClient, RedisConnection}

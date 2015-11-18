@@ -4,7 +4,7 @@ import java.sql.{Statement, Connection, ResultSet}
 import javax.annotation.PostConstruct
 
 import com.mysql.jdbc.jdbc2.optional.MysqlDataSource
-import org.bentocorp.BentoConfig
+import org.bentocorp.houston.config.BentoConfig
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component

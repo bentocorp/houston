@@ -1,11 +1,14 @@
 package org.bentocorp.controllers
 
+import java.security.SecureRandom
 import javax.annotation.PostConstruct
+import javax.net.ssl._
 
 import com.fasterxml.jackson.core.`type`.TypeReference
-import com.github.nkzawa.emitter.Emitter.Listener
-import com.github.nkzawa.socketio.client.{Ack, IO, Socket}
-import org.bentocorp.Preamble.Http
+import io.socket.client.{Manager, Ack, IO, Socket}
+import io.socket.emitter.Emitter.Listener
+import io.socket.engineio.client.{EngineIOException, Transport}
+import org.bentocorp.houston.util.{PhoneUtils, HttpUtils}
 import org.bentocorp._
 import org.bentocorp.api.APIResponse._
 import org.bentocorp.api.ws.{OrderAction, OrderStatus, Push, Stat}
@@ -13,6 +16,7 @@ import org.bentocorp.api.{APIResponse, Authenticate, Track}
 import org.bentocorp.aws.SQS
 import org.bentocorp.db.{Database, GenericOrderDao}
 import org.bentocorp.dispatch._
+import org.bentocorp.houston.config.BentoConfig
 import org.bentocorp.mapbox.MapboxService
 import org.bentocorp.mapbox.WayPoint
 import org.bentocorp.redis.Redis
@@ -21,7 +25,6 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.web.bind.annotation.{RequestMapping, RequestParam, RestController}
 
 import scala.collection.JavaConversions._
-import scala.collection.mutable.{ListBuffer => List, Map}
 
 @RestController
 @RequestMapping(Array("/api"))
@@ -52,11 +55,27 @@ class HttpController {
 
   @PostConstruct
   def init() {
-    NODE_URL = "http://%s:%s" format (config.getString("node.host"), config.getString("node.port"))
+    HttpUtils.configureFor(config.getString("env"))
+    NODE_URL = "https://%s:%s" format (config.getString("node.host"), config.getString("node.port"))
     socket = {
       val opts = new IO.Options
-      val url = NODE_URL
-      IO.socket(url, opts)
+      opts.secure = true
+      // If not on prod, configure an SSLContext with a TrustManager that accepts all certificates
+      if (config.getString("env") != "prod") {
+        Logger.info("\n" +
+          "***************\n" +
+          "** ATTENTION **\n" +
+          "***************\n" +
+          "Configuring SSLContext with TrustManager that accepts all certificates")
+        val customTrustManager = HttpUtils.acceptAllCertsTrustManager
+
+        val sslContext = SSLContext.getInstance("TLS")
+        sslContext.init(Array.empty[KeyManager], Array(customTrustManager), new SecureRandom)
+
+        opts.sslContext = sslContext
+        opts.hostnameVerifier = HttpUtils.relaxedHostnameVerifier
+      }
+      IO.socket(NODE_URL, opts)
     }
     socket.on(Socket.EVENT_CONNECT, new Listener {
       override def call(args: Object*) {
@@ -105,8 +124,11 @@ class HttpController {
     })
 
     socket.on(Socket.EVENT_DISCONNECT, new Listener {
+
       override def call(args: Object*) {
-        Logger.info("Disconnected from Node server")
+        val msg = "Disconnected from Node server due to: " + args(0)
+//        println(msg)
+        Logger.info(msg)
         SQS.stop()
       }
     })
@@ -129,15 +151,45 @@ class HttpController {
       }
     })
 
-    Logger.info("Trying to connect to Node server")
+    /* Certain connectivity problems can be identified by inspecting the underlying Transport object of the Socket.IO
+       client–for example, failure to upgrade to the WebSocket protocol due to SSL issues. */
+    val transportLogger = LoggerFactory.getLogger("socket-io-transport")
+
+    import java.util.{Map => JMap}
+
+    socket.io().on(Manager.EVENT_TRANSPORT, new Listener {
+
+      override def call(args: AnyRef*) {
+        val transport: Transport = args(0).asInstanceOf[Transport]
+        // Implicitly convert java.util.Map to a Scala Map using toMap()
+        val parts = (transport.query.toMap.toList map {
+          case (k, v) => k + "=" + v
+        }).mkString("&")
+        // Listen for errors
+        transport.on(Transport.EVENT_ERROR, new Listener {
+          override def call(args: AnyRef*) {
+            val ex = args(0).asInstanceOf[EngineIOException]
+            transportLogger.error(
+              "Transport (%s) error - %s" format (transport.name, ex.getMessage),
+              ex.getStackTrace
+            )
+          }
+        })
+      }
+    });
+
+    Logger.info("Trying to connect to Node server at " + NODE_URL)
 
     socket.connect()
   }
 
   @RequestMapping(Array("/push"))
   def send[T](p: Push[T]): APIResponse[String] = {
-    val str = Http.get("http://%s:%s/api/push" format (config.getString("node.host"), config.getString("node.port")), "rid" -> p.rid, "from" -> p.from, "to" -> p.to, "subject" -> p.subject,
+    val params = Map("rid"  -> p.rid, "from" -> p.from, "to" -> p.to, "subject" -> p.subject,
       "body" -> ScalaJson.stringify(p.body), "token" -> token)
+    val str = HttpUtils.get(
+      "http://%s:%s/api/push" format (config.getString("node.host"), config.getString("node.port")), params
+    )
     ScalaJson.parse(str, new TypeReference[APIResponse[String]]() { })
   }
 
@@ -164,7 +216,6 @@ class HttpController {
   @Autowired
   var genericOrderDao: GenericOrderDao = null
 
-  import org.bentocorp.Preamble._
   @RequestMapping(Array("/order/create"))
   def create(@RequestParam(value = "token"  ) token  : String,
              @RequestParam(value = "name"   ) name   : String,
@@ -179,7 +230,7 @@ class HttpController {
              @RequestParam(value = "body"   ) body   : String,
              @RequestParam(value = "driverId", defaultValue = "") driverId: String): String = {
     val order = genericOrderDao.insert(Database.Map(
-      "fk_Driver" -> (if (driverId.isEmpty) -1L else driverId.toLong), "name" -> name, "phone" -> normalize_phone(phone), "street" -> street, "city" -> city, "region" -> state,
+      "fk_Driver" -> (if (driverId.isEmpty) -1L else driverId.toLong), "name" -> name, "phone" -> PhoneUtils.normalize_phone(phone), "street" -> street, "city" -> city, "region" -> state,
       "zip_code" -> zipCode, "country" -> country, "lat" -> lat, "lng" -> lng, "body" -> body))
     orderManager.genericOrders += order.getOrderKey -> order
     this.send(OrderAction.make(OrderAction.Type.CREATE, order, null, null).from("houston").toGroup("atlas")) // check response?
@@ -277,7 +328,7 @@ class HttpController {
     //send(new Push("test_subject", "Hello, World!").from("houston").toGroup("atlas"))
     // Get driver's current location from Node
     val order = orderManager.getOrder(orderId)
-    val res = Http.get(NODE_URL + "/api/gloc", "token"->token, "clientId" -> ("d-"+order.getDriverId))
+    val res = HttpUtils.get(NODE_URL + "/api/gloc", Map("token"->token, "clientId" -> ("d-"+order.getDriverId)))
     val driverCurrentLoc: APIResponse[WayPoint] = ScalaJson.parse(res, new TypeReference[APIResponse[WayPoint]]() { })
     val wayPoints: Array[WayPoint] = Array(
       driverCurrentLoc.ret,
@@ -288,7 +339,7 @@ class HttpController {
   }
 
   protected def track(driverId: Long): Driver.Status = {
-    val str = Http.get(NODE_URL + "/api/track", "clientId" -> ("d-"+driverId), "token" -> token)
+    val str = HttpUtils.get(NODE_URL + "/api/track", Map("clientId" -> ("d-"+driverId), "token" -> token))
     val res: APIResponse[Track] = ScalaJson.parse(str, new TypeReference[APIResponse[Track]] { })
     if (res.code != 0) {
       throw new Exception("Error tracking %s - %s" format (driverId, res.msg))
@@ -344,7 +395,7 @@ class HttpController {
         try {
           // At this point, log any Exceptions but otherwise return a successful response
           // Get driver's current location from Node
-          val res = Http.get(NODE_URL + "/api/gloc", "token"->token, "clientId" -> ("d-"+order.getDriverId))
+          val res = HttpUtils.get(NODE_URL + "/api/gloc", Map("token"->token, "clientId" -> ("d-"+order.getDriverId)))
           val driverCurrentLoc: APIResponse[WayPoint] = ScalaJson.parse(res, new TypeReference[APIResponse[WayPoint]]() { })
           val wayPoints: Array[WayPoint] = Array(
             driverCurrentLoc.ret,

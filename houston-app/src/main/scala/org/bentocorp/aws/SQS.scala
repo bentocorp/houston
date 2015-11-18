@@ -8,12 +8,13 @@ import com.amazonaws.services.sqs.{AmazonSQSClient, AmazonSQS}
 import com.fasterxml.jackson.core.`type`.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import org.bentocorp.Preamble.Http
 import org.bentocorp.api.APIResponse
 import org.bentocorp.api.ws.OrderAction
 import org.bentocorp._
 import org.bentocorp.controllers.HttpController
 import org.bentocorp.dispatch.OrderManager
+import org.bentocorp.houston.config.BentoConfig
+import org.bentocorp.houston.util.HttpUtils
 import org.slf4j.LoggerFactory
 import scala.collection.JavaConversions._
 
@@ -81,8 +82,10 @@ class SQS(controller: HttpController) extends Thread {
         if (!orderManager.orders.contains(order.getOrderKey)) {
           orderManager.orders += (order.getOrderKey -> order)
           val p = OrderAction.make(OrderAction.Type.CREATE, order, -1L, null).from("houston").toGroup("atlas")
-          val str = Http.get("http://%s:%s/api/push" format (config.getString("node.host"), config.getString("node.port")), "rid" -> p.rid, "from" -> p.from, "to" -> p.to, "subject" -> p.subject,
-            "body" -> ScalaJson.stringify(p.body), "token" -> token)
+          val str = HttpUtils.get(
+            "http://%s:%s/api/push" format (config.getString("node.host"), config.getString("node.port")),
+            Map("rid" -> p.rid, "from" -> p.from, "to" -> p.to, "subject" -> p.subject,
+            "body" -> ScalaJson.stringify(p.body), "token" -> token))
           val res: APIResponse[String] = ScalaJson.parse(str, new TypeReference[APIResponse[String]]() { })
           if (res.code != 0) {
             Logger.error("Error sending SQS order to atlas group - " + res.msg)

@@ -117,15 +117,15 @@
         <!-- socket.io -->
 
         <dependency>
-            <groupId>com.github.nkzawa</groupId>
+            <groupId>io.socket</groupId>
             <artifactId>socket.io-client</artifactId>
-            <version>0.6.0</version>
+            <version>0.6.2</version>
         </dependency>
 
         <dependency>
-            <groupId>com.github.nkzawa</groupId>
+            <groupId>io.socket</groupId>
             <artifactId>engine.io-client</artifactId>
-            <version>0.6.0</version>
+            <version>0.6.2</version>
         </dependency>
 
         <dependency>

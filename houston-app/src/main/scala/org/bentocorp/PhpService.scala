@@ -15,12 +15,10 @@ import org.apache.http.conn.ssl.{SSLConnectionSocketFactory, TrustStrategy}
 import org.apache.http.impl.client.HttpClientBuilder
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import org.apache.http.ssl.SSLContextBuilder
+import org.bentocorp.houston.config.BentoConfig
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
-
-import org.bentocorp.Preamble._
-import org.springframework.web.bind.annotation.RequestMapping
 
 @Component
 class PhpService {

@@ -9,6 +9,8 @@ import javax.annotation.PostConstruct
 import org.bentocorp._
 import org.bentocorp.db._
 import org.bentocorp.filter.ResyncInterceptor
+import org.bentocorp.houston.config.BentoConfig
+import org.bentocorp.houston.util.PhoneUtils
 import org.bentocorp.redis.{RMap, Redis}
 import org.redisson.Redisson
 import org.slf4j.LoggerFactory
@@ -67,8 +69,6 @@ class OrderManager {
     })
   }
 
-  import Preamble._
-
   def syncOrders() {
     // First, retrieve the menu
     val dishes = MMap.empty[Long, BentoBox.Item]
@@ -108,7 +108,7 @@ class OrderManager {
                 val address = new Address(numberOpt.getOrElse("") + " " + street, null, city, state, zipCodeOpt.getOrElse(""), "United States")
                 address.lat = lat.toFloat
                 address.lng = lng.toFloat
-                val newOrder = new Order[Bento]("o-" + orderId, firstname + " " + lastname, normalize_phone(phone), address, new Bento)
+                val newOrder = new Order[Bento]("o-" + orderId, firstname + " " + lastname, PhoneUtils.normalize_phone(phone), address, new Bento)
                 val driverId = if (driverIdOpt.isDefined && driverIdOpt.get > 0) new java.lang.Long(driverIdOpt.get) else null
                 newOrder.setDriverIdWithStatus(driverId, status)
                 orders += orderId -> newOrder

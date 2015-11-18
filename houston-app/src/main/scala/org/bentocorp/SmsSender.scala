@@ -7,6 +7,7 @@ import com.twilio.sdk.TwilioRestClient
 import com.twilio.sdk.resource.instance.Account
 import org.apache.http.NameValuePair
 import org.apache.http.message.BasicNameValuePair
+import org.bentocorp.houston.config.BentoConfig
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
