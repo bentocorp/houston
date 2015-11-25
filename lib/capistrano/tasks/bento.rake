@@ -9,7 +9,8 @@ end
 desc "Start Houston"
 task :start do
 	on roles(:all) do |host|
-		execute "nohup java -jar -Dserver.port=8081 #{fetch(:deploy_to)}/current/houston-app/target/houston-app-0.1.0.jar --env=#{fetch(:stage)} >/dev/null 2>&1 &"
+		# Make sure to "cd /sites/houston/current" so log files are not written to home directory
+		execute "cd #{fetch(:deploy_to)}/current; nohup java -jar -Dserver.port=8081 houston-app/target/houston-app-0.1.0.jar --env=#{fetch(:stage)} >/dev/null 2>&1 &"
 		#execute "java -jar -Dserver.port=8081 #{fetch(:deploy_to)}/current/houston-app/target/houston-app-0.1.0.jar --env=#{fetch(:stage)} --flush-redis"
 	end
 end
