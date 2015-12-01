@@ -188,7 +188,7 @@ class HttpController {
     val params = Map("rid"  -> p.rid, "from" -> p.from, "to" -> p.to, "subject" -> p.subject,
       "body" -> ScalaJson.stringify(p.body), "token" -> token)
     val str = HttpUtils.get(
-      "http://%s:%s/api/push" format (config.getString("node.host"), config.getString("node.port")), params
+      "https://%s:%s/api/push" format (config.getString("node.host"), config.getString("node.port")), params
     )
     ScalaJson.parse(str, new TypeReference[APIResponse[String]]() { })
   }
