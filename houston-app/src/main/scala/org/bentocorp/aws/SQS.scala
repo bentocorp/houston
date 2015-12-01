@@ -83,7 +83,7 @@ class SQS(controller: HttpController) extends Thread {
           orderManager.orders += (order.getOrderKey -> order)
           val p = OrderAction.make(OrderAction.Type.CREATE, order, -1L, null).from("houston").toGroup("atlas")
           val str = HttpUtils.get(
-            "https://%s:%s/api/push" format (config.getString("node.host"), config.getString("node.port")),
+            config.getString("node.url") + "/api/push",
             Map("rid" -> p.rid, "from" -> p.from, "to" -> p.to, "subject" -> p.subject,
             "body" -> ScalaJson.stringify(p.body), "token" -> token))
           val res: APIResponse[String] = ScalaJson.parse(str, new TypeReference[APIResponse[String]]() { })

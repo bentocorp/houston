@@ -11,7 +11,8 @@ import slick.driver.MySQLDriver.simple._
 import slick.lifted.{Tag, TableQuery}
 
 class TOrder(tag: Tag) extends Table[(Long, Option[Long], Option[Timestamp], Option[String], Option[String],
-  Option[String], Option[String], Option[String], Option[String], Option[String])](tag, "Order") {
+  Option[String], Option[String], Option[String], Option[String], Option[String], Option[String])](tag, "Order") {
+
   def pk_Order = column[Long]("pk_Order", O.PrimaryKey, O.AutoInc)
   def fk_User = column[Option[Long]]("fk_User")
   def created_at = column[Option[Timestamp]]("created_at")
@@ -22,11 +23,12 @@ class TOrder(tag: Tag) extends Table[(Long, Option[Long], Option[Timestamp], Opt
   def zip = column[Option[String]]("zip")
   def lat = column[Option[String]]("lat")
   def long = column[Option[String]]("long")
-  def * = (pk_Order, fk_User, created_at, number, street, city, state, zip, lat, long)
+  def notes_for_driver = column[Option[String]]("notes_for_driver")
+  def * = (pk_Order, fk_User, created_at, number, street, city, state, zip, lat, long, notes_for_driver)
 }
 
 @Component
-class OrderDao {
+class OrderDao extends Updatable("Order") {
 
   final val Logger = LoggerFactory.getLogger(classOf[OrderDao])
 
@@ -67,7 +69,8 @@ class OrderDao {
         b.fk_side3,
         b.fk_side4,
         s.status,
-        s.fk_Driver
+        s.fk_Driver,
+        o.notes_for_driver
       )}
     res.list
   }

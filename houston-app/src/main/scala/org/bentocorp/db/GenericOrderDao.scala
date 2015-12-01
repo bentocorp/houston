@@ -12,35 +12,38 @@ import slick.driver.MySQLDriver.simple._
 import slick.lifted.{Tag, TableQuery}
 
 class TGenericOrder(tag: Tag) extends Table[(Option[Long], Timestamp, Option[Timestamp], Option[Timestamp], String,
-  Option[Long], Option[String], Option[String], Option[String], Option[String], Option[String],
-  Option[String], Option[String], Option[String], Option[String], Option[String])](tag, "generic_Order") {
+  Option[Long], Option[String], Option[String], Option[String], Option[String], Option[String], Option[String],
+  Option[String], Option[String], Option[String], Option[String], Option[String], Option[String])](tag, "generic_Order") {
+
   def pk_generic_Order = column[Option[Long]]("pk_generic_Order", O.PrimaryKey, O.AutoInc)
   def created_at = column[Timestamp]("created_at", O.NotNull)
   def updated_at = column[Option[Timestamp]]("updated_at")
   def deleted_at = column[Option[Timestamp]]("deleted_at")
   def status = column[String]("status")
   def fk_Driver = column[Option[Long]]("fk_Driver")
-  def name = column[Option[String]]("name")
+  def firstname = column[Option[String]]("firstname")
+  def lastname = column[Option[String]]("lastname")
   def phone = column[Option[String]]("phone")
   def street = column[Option[String]]("street")
   def city = column[Option[String]]("city")
-  def region = column[Option[String]]("region")
-  def zip_code = column[Option[String]]("zip_code")
+  def region = column[Option[String]]("state")
+  def zip_code = column[Option[String]]("zip")
   def country = column[Option[String]]("country")
   def lat = column[Option[String]]("lat")
-  def lng = column[Option[String]]("lng")
+  def lng = column[Option[String]]("long")
   def body = column[Option[String]]("body")
-  def * = (pk_generic_Order, created_at, updated_at, deleted_at, status, fk_Driver, name, phone, street,
-    city, region, zip_code, country, lat, lng, body)
+  def notes_for_driver = column[Option[String]]("notes_for_driver")
+  def * = (pk_generic_Order, created_at, updated_at, deleted_at, status, fk_Driver, firstname, lastname, phone, street,
+    city, region, zip_code, country, lat, lng, body, notes_for_driver)
 }
 
 @Component
-class GenericOrderDao {
+class GenericOrderDao extends Updatable("generic_Order") {
 
   final val Logger = LoggerFactory.getLogger(classOf[GenericOrderDao])
 
   @Autowired
-  val database: Database = null
+  var database: Database = null
 
   val genericOrders = TableQuery[TGenericOrder]
 
@@ -52,7 +55,8 @@ class GenericOrderDao {
       r.pk_generic_Order,
       r.status,
       r.fk_Driver,
-      r.name,
+      r.firstname,
+      r.lastname,
       r.phone,
       r.street,
       r.city,
@@ -61,14 +65,16 @@ class GenericOrderDao {
       r.country,
       r.lat,
       r.lng,
-      r.body
+      r.body,
+      r.notes_for_driver
     )).list
   }
 
   def insert(values: Database.Map): Order[String] = database() withSession { implicit session =>
     val createdAt = new Timestamp(System.currentTimeMillis)
     val driverId = values.get[Long]("fk_Driver")
-    val name = values.get[String]("name")
+    val firstname = values.get[String]("firstname")
+    val lastname = values.get[String]("lastname")
     val phone = values.get[String]("phone")
     val street = values.get[String]("street")
     val city = values.get[String]("city")
@@ -78,16 +84,18 @@ class GenericOrderDao {
     val lat = values.get[String]("lat")
     val lng = values.get[String]("lng")
     val body = values.get[String]("body")
+    val notes = values.get[String]("notes_for_driver")
     // Try writing to the database first
     val orderId = (genericOrders returning genericOrders.map(_.pk_generic_Order)) += (None, createdAt, None, None,
-      Order.Status.UNASSIGNED.toString, driverId, name, phone, street, city, region, zipCode, country,
-      lat, lng, body)
+      Order.Status.UNASSIGNED.toString, driverId, firstname, lastname, phone, street, city, region, zipCode, country,
+      lat, lng, body, notes)
     // If successful, return a new Order instance
     // TODO - implied non-nullable parameters not reflected in database schema
     val address = new Address(street.get, null, city.get, region.get, zipCode.get, country.get)
     if (lat.isDefined) address.lat = lat.get.toFloat
     if (lng.isDefined) address.lng = lng.get.toFloat
-    val order = new Order[String]("g-" + orderId.get, name.get, phone.get, address, body.get)
+    val order = new Order[String]("g-" + orderId.get, firstname.get, lastname.get, phone.get, address, body.get)
+    order.notes = notes.getOrElse("")
     order
   }
 

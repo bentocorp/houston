@@ -95,7 +95,7 @@ class OrderManager {
     val orders = MMap.empty[Long, Order[Bento]]
     Logger.info("Fetching orders created on or after %s" format DATE_FORMATTER.format(startOfToday))
     orderDao.select(startOfToday) foreach {
-      case (orderId, Some(firstname), Some(lastname), Some(phone), numberOpt, Some(street), Some(city), Some(state), zipCodeOpt, Some(lat), Some(lng), Some(main), Some(side1), Some(side2), Some(side3), Some(side4), Some(statusStr), driverIdOpt) =>
+      case (orderId, Some(firstname), Some(lastname), Some(phone), numberOpt, Some(street), Some(city), Some(state), zipCodeOpt, Some(lat), Some(lng), Some(main), Some(side1), Some(side2), Some(side3), Some(side4), Some(statusStr), driverIdOpt, notesOpt) =>
         val status = Order.Status.parse(statusStr)
         if (status == Order.Status.CANCELLED) {
           Logger.debug("Ignoring %s order %s" format (status, orderId))
@@ -108,9 +108,10 @@ class OrderManager {
                 val address = new Address(numberOpt.getOrElse("") + " " + street, null, city, state, zipCodeOpt.getOrElse(""), "United States")
                 address.lat = lat.toFloat
                 address.lng = lng.toFloat
-                val newOrder = new Order[Bento]("o-" + orderId, firstname + " " + lastname, PhoneUtils.normalize_phone(phone), address, new Bento)
+                val newOrder = new Order[Bento]("o-" + orderId, firstname, lastname, PhoneUtils.normalize(phone), address, new Bento)
                 val driverId = if (driverIdOpt.isDefined && driverIdOpt.get > 0) new java.lang.Long(driverIdOpt.get) else null
                 newOrder.setDriverIdWithStatus(driverId, status)
+                newOrder.notes = notesOpt.getOrElse("")
                 orders += orderId -> newOrder
                 newOrder
             }
@@ -129,7 +130,9 @@ class OrderManager {
     val genericOrders = MMap.empty[Long, Order[String]]
     Logger.info("Fetching generic orders created on or after %s" format DATE_FORMATTER.format(startOfToday))
     genericOrderDao.select(startOfToday) foreach {
-      case (Some(orderId), statusStr, driverIdOpt, Some(name), Some(phone), Some(street), Some(city), Some(state), Some(zipCode), Some(country), lat, lng, Some(body)) =>
+      // Note: Since "name" was split into "firstname" and "lastname", lastname may be null and that case must be
+      // accounted for
+      case (Some(orderId), statusStr, driverIdOpt, Some(firstname), lastnameOpt, Some(phone), Some(street), Some(city), Some(state), Some(zipCode), Some(country), lat, lng, Some(body), notesOpt) =>
         val status = Order.Status.parse(statusStr)
         if (status == Order.Status.CANCELLED) {
           Logger.debug("Ignoring %s order %s" format (status, orderId))
@@ -142,9 +145,10 @@ class OrderManager {
           if (lng.isDefined) {
             address.lng = lng.get.toFloat
           }
-          val order = new Order[String]("g-" + orderId, name, phone, address, body)
+          val order = new Order[String]("g-" + orderId, firstname, lastnameOpt.orNull, phone, address, body)
           val driverId = if (driverIdOpt.isDefined && driverIdOpt.get > 0) new java.lang.Long(driverIdOpt.get) else new java.lang.Long(-1L)
           order.setDriverIdWithStatus(driverId, status)
+          order.notes = notesOpt.getOrElse("")
           genericOrders += (orderId -> order)
         }
       case row =>
@@ -169,7 +173,7 @@ class OrderManager {
       case _ => throw new Exception("Error - Unrecognized order type trying to get order " + orderId)
     }
     if (orderOpt.isEmpty) {
-      throw new Exception("Error - Order %s not found" format (orderId))
+      throw new Exception("Error - Order %s not found" format orderId)
     }
     orderOpt.get
   }
@@ -378,6 +382,41 @@ class OrderManager {
       }
     } finally {
       redis.unlock(order.getLockId)
+    }
+  }
+
+  @throws(classOf[Exception])
+  def update(order: Order[_]) {
+    // Keys must match column names in database!
+    // First get values for columns common to both Bento and generic orders.
+    var cols = Map(
+      "phone"  -> order.phone,
+      "city"   -> order.address.city,
+      "state"  -> order.address.region,
+      "zip"    -> order.address.zipCode,
+      "lat"    -> order.address.lat.toString,
+      "long"   -> order.address.lng.toString,
+      "notes_for_driver" -> order.notes
+    )
+
+    // Try updating the database first. Then, if successful, set to cache.
+    order.getOrderType match {
+      case "o" =>
+        // For Bento orders, we need to split street into street number and street name
+        cols += "number" -> Address.extractNumberFromStreet(order.address.street).toString
+        cols += "street" -> Address.extractNameFromStreet(order.address.street)
+        if (orderDao.update(order.getOrderKey, cols) <= 0) {
+          throw new Exception()
+        }
+        orders += (order.getOrderKey -> order.asInstanceOf[Order[Bento]])
+      case "g" =>
+        cols += "street" -> order.address.street
+        if (genericOrderDao.update(order.getOrderKey, cols) <= 0) {
+          throw new Exception()
+        }
+        genericOrders += (order.getOrderKey -> order.asInstanceOf[Order[String]])
+      case _ =>
+        throw new Exception()
     }
   }
 }

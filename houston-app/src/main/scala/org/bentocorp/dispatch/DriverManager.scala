@@ -41,7 +41,7 @@ class DriverManager {
     val drivers = MMap.empty[Long, Driver]
     driverDao.selectAllActive foreach {
       case (pk, Some(firstname), Some(lastname), Some(phone), statusByte, queueStr) =>
-        val normalizedPhone = PhoneUtils.normalize_phone(phone)
+        val normalizedPhone = PhoneUtils.normalize(phone)
         val status = if (statusByte > 0) Driver.Status.ONLINE else Driver.Status.OFFLINE
         val driver = new Driver(pk, firstname + " " + lastname, normalizedPhone, status)
         queueStr match {

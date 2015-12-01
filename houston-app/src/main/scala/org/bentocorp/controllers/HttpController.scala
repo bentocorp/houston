@@ -56,7 +56,7 @@ class HttpController {
   @PostConstruct
   def init() {
     HttpUtils.configureFor(config.getString("env"))
-    NODE_URL = "https://%s:%s" format (config.getString("node.host"), config.getString("node.port"))
+    NODE_URL = config.getString("node.url")
     socket = {
       val opts = new IO.Options
       opts.secure = true
@@ -188,7 +188,7 @@ class HttpController {
     val params = Map("rid"  -> p.rid, "from" -> p.from, "to" -> p.to, "subject" -> p.subject,
       "body" -> ScalaJson.stringify(p.body), "token" -> token)
     val str = HttpUtils.get(
-      "https://%s:%s/api/push" format (config.getString("node.host"), config.getString("node.port")), params
+      config.getString("node.url") + "/api/push", params
     )
     ScalaJson.parse(str, new TypeReference[APIResponse[String]]() { })
   }
@@ -218,29 +218,83 @@ class HttpController {
 
   @RequestMapping(Array("/order/create"))
   def create(@RequestParam(value = "token"  ) token  : String,
-             @RequestParam(value = "name"   ) name   : String,
+             @RequestParam(value = "firstName") firstName: String,
+             @RequestParam(value = "lastName" ) lastName : String,
              @RequestParam(value = "phone"  ) phone  : String,
              @RequestParam(value = "street" ) street : String,
              @RequestParam(value = "city"   ) city   : String,
              @RequestParam(value = "state"  ) state  : String,
              @RequestParam(value = "zipCode") zipCode: String,
              @RequestParam(value = "country") country: String,
-             @RequestParam(value = "lat"    ) lat    : String ,
-             @RequestParam(value = "lng"    ) lng    : String ,
+             @RequestParam(value = "lat"    ) lat    : String,
+             @RequestParam(value = "lng"    ) lng    : String,
              @RequestParam(value = "body"   ) body   : String,
+             @RequestParam(value = "notes"  ) notes  : String,
              @RequestParam(value = "driverId", defaultValue = "") driverId: String): String = {
-    val order = genericOrderDao.insert(Database.Map(
-      "fk_Driver" -> (if (driverId.isEmpty) -1L else driverId.toLong), "name" -> name, "phone" -> PhoneUtils.normalize_phone(phone), "street" -> street, "city" -> city, "region" -> state,
-      "zip_code" -> zipCode, "country" -> country, "lat" -> lat, "lng" -> lng, "body" -> body))
-    orderManager.genericOrders += order.getOrderKey -> order
-    this.send(OrderAction.make(OrderAction.Type.CREATE, order, null, null).from("houston").toGroup("atlas")) // check response?
-    if (!driverId.isEmpty) {
-      val modifiedOrder = orderManager.assign(order.id, driverId.toLong, null, token)
-      val push = OrderAction.make(OrderAction.Type.ASSIGN, modifiedOrder, driverId.toLong, null).from("houston")
-      this.send(push.toGroup("atlas"))
-      this.send(push.toRecipient("d-" + driverId))
+    try {
+      val order = genericOrderDao.insert(Database.Map(
+        "fk_Driver" -> (if (driverId.isEmpty) -1L else driverId.toLong), "firstname" -> firstName, "lastname" -> lastName,
+        "phone" -> PhoneUtils.normalize(phone), "street" -> street, "city" -> city, "region" -> state,
+        "zip_code" -> zipCode, "country" -> country, "lat" -> lat, "lng" -> lng, "body" -> body, "notes_for_driver" -> notes))
+      orderManager.genericOrders += order.getOrderKey -> order
+      this.send(OrderAction.make(OrderAction.Type.CREATE, order, null, null).from("houston").toGroup("atlas")) // check response?
+      if (!driverId.isEmpty) {
+        val modifiedOrder = orderManager.assign(order.id, driverId.toLong, null, token)
+        val push = OrderAction.make(OrderAction.Type.ASSIGN, modifiedOrder, driverId.toLong, null).from("houston")
+        this.send(push.toGroup("atlas"))
+        this.send(push.toRecipient("d-" + driverId))
+      }
+      success("OK")
+    } catch {
+      case e: Exception =>
+        Logger.error(e.getMessage, e.getStackTrace)
+        error(1, e.getMessage)
     }
-    success("OK")
+
+  }
+
+  @RequestMapping(Array("/order/update"))
+  def updateOrder(@RequestParam(value = "rid", defaultValue = "") rid: String,
+                  @RequestParam(value = "orderId") orderId: String,
+//                  @RequestParam(value = "firstName", defaultValue = "") firstName: String,
+//                  @RequestParam(value = "lastName" , defaultValue = "") lastName : String,
+                  @RequestParam(value = "phone"    , defaultValue = "") phone    : String,
+                  @RequestParam(value = "street"   , defaultValue = "") street   : String,
+                  @RequestParam(value = "city"     , defaultValue = "") city     : String,
+                  @RequestParam(value = "state"    , defaultValue = "") state    : String,
+                  @RequestParam(value = "zipCode"  , defaultValue = "") zipCode  : String,
+//                  @RequestParam(value = "country"  , defaultValue = "") country  : String,
+                  @RequestParam(value = "lat"      , defaultValue = "") lat      : String,
+                  @RequestParam(value = "lng"      , defaultValue = "") lng      : String,
+                  @RequestParam(value = "notes"    , defaultValue = "") notes    : String): String = {
+    try {
+      val order = orderManager.getOrder(orderId)
+
+      // Safety check and redundancy - only consider non-null & non-empty values
+      val valid: (String) => Boolean = (arg0: String) => arg0 != null && !arg0.isEmpty
+
+      // Cannot modify first and last name due to the way Bento orders are stored in the database
+//      if (valid(firstName)) order.firstName = firstName
+//      if (valid( lastName)) order.lastName  = lastName
+      if (valid(    phone)) order.phone     = phone
+      if (valid(   street)) order.address.street  = street
+      if (valid(     city)) order.address.city    = city
+      if (valid(    state)) order.address.region  = state
+      if (valid(  zipCode)) order.address.zipCode = zipCode
+      // Table schema for Bento orders does not have country column
+//      if (valid(  country)) order.address.country = country
+      if (valid(      lat)) order.address.lat     = lat.toFloat
+      if (valid(      lng)) order.address.lng     = lng.toFloat
+      if (valid(    notes)) order.notes     = notes
+
+      orderManager.update(order)
+      send(OrderAction.make(OrderAction.Type.MODIFY, order, -1l, null).rid(rid).from("houston").toGroup("atlas"))
+      success(order)
+    } catch {
+      case e: Exception =>
+        Logger.error(e.getMessage, e.getStackTrace)
+        error(1, e.getMessage)
+    }
   }
 
   @Autowired
@@ -385,8 +439,8 @@ class HttpController {
       send(push)
       // Let the customer know that a driver is on the way
       val greeting = {
-        if (order.name != null && !order.name.isEmpty) {
-          "Hi %s,\n" format order.name.split(" ")(0)
+        if (order.firstName != null && !order.firstName.isEmpty) {
+          "Hi %s,\n" format order.firstName
         } else {
           "Hi!\n"
         }
@@ -488,7 +542,7 @@ class HttpController {
   def eta(@RequestParam("orderId") orderId: String, @RequestParam("minutes") minutes: Int) = {
     try {
       val order = orderManager.getOrder(orderId)
-      val firstname = order.name.split(" ")(0)
+      val firstname = order.firstName
       if (minutes <= 0) {
         throw new Exception("Invalid minutes %s" format minutes)
       }

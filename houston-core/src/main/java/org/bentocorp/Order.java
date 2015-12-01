@@ -2,6 +2,7 @@ package org.bentocorp;
 
 import com.fasterxml.jackson.annotation.*;
 import org.bentocorp.dispatch.Address;
+import org.bentocorp.houston.util.PhoneUtils;
 
 import java.util.List;
 import java.util.concurrent.locks.Lock;
@@ -42,15 +43,21 @@ public class Order<T> {
     public final String orderType;
     public final long key;
 
-    public final String name;
+    public String firstName;
 
-    public final Address address;
+    public String lastName;
+
+    public Address address;
 
     public String phone;
 
     public final T item;
 
+    // This public field is a JSON placeholder for what will show in the Driver App. The string is constructed in the
+    // PHP backend and set here during JSON deserialization
     public String orderString = "";
+
+    public String notes = "";
 
     //Irrelevant if orders are stored in distributed cache
 //    @JsonIgnore
@@ -60,21 +67,6 @@ public class Order<T> {
 
     private Status status = Status.UNASSIGNED;
     //public int priority;
-
-    static String normalize_phone(String phone) {
-        if(phone.isEmpty()) {
-            return "";
-        }
-        String res = phone.replaceAll("\\(|\\)|\\-|\\s", "");
-
-        if (res.charAt(0) != '+') {
-                if (res.length() <= 10) {
-                    res = "1" + res;
-                }
-                res = "+" + res;
-            }
-        return res;
-    }
 
     public static Order<Bento> parse(org.bentocorp.aws.Order o) throws Exception {
         Address address = Address.parse(o.details.address);
@@ -86,8 +78,9 @@ public class Order<T> {
         }
         Order<Bento> order = new Order<Bento>(
             "o-" + o.orderId,
-            o.user.firstname + " " + o.user.lastname,
-            normalize_phone(o.user.phone),
+            o.user.firstname,
+            o.user.lastname,
+            PhoneUtils.normalize(o.user.phone),
             address,
             bentoOrder
         );
@@ -96,11 +89,12 @@ public class Order<T> {
     }
 
     @JsonCreator
-    public Order(@JsonProperty("id") String id,
-                 @JsonProperty("name") String name,
-                 @JsonProperty("phone") String phone,
-                 @JsonProperty("address") Address address,
-                 @JsonProperty("item") T item) throws Exception {
+    public Order(@JsonProperty("id")        String  id,
+                 @JsonProperty("firstName") String  firstName,
+                 @JsonProperty("lastName")  String  lastName,
+                 @JsonProperty("phone")     String  phone,
+                 @JsonProperty("address")   Address address,
+                 @JsonProperty("item")      T       item) throws Exception {
         // Safety check for JSON deserialization
         if (id.isEmpty()) {
             String msg = "Invalid order ID %s - If this was thrown during JSON deserialization, check that the " +
@@ -111,7 +105,8 @@ public class Order<T> {
         String[] parts = id.split("-");
         this.orderType = parts[0];
         this.key = Long.parseLong(parts[1]);
-        this.name = name;
+        this.firstName = firstName;
+        this.lastName = lastName;
         this.phone = phone;
         this.address = address;
         this.item = item;
@@ -197,5 +192,11 @@ public class Order<T> {
     public String getLockId() {
         // redis-order#b-890
         return "redis-order#" + id;
+    }
+
+    // For backward compatibility so a code change is not required in the driver app
+    @JsonProperty("name")
+    public String getName() {
+        return firstName + " " + lastName;
     }
 }

@@ -4,19 +4,22 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.bentocorp.aws.Order;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 public class Address {
 
-    final public String street;
+    public String street;
 
-    final public String residence;
+    public String residence;
 
-    final public String city;
+    public String city;
 
-    final public String region; // province, state, or territory
+    public String region; // province, state, or territory
 
-    final public String zipCode;
+    public String zipCode;
 
-    final public String country;
+    public String country;
 
     public Float lat = null;
 
@@ -36,6 +39,33 @@ public class Address {
             address.zip,
             "United States"
         );
+    }
+
+    public static Integer extractNumberFromStreet(String street) {
+        String[] parts = street.split(" ");
+        if (parts.length >= 3) {
+            return new Integer(parts[0]);
+        } else {
+            return null;
+        }
+        /*
+        Pattern pattern = Pattern.compile("^([1-9][0-9a-zA-Z])\\s");
+        Matcher matcher = pattern.matcher(street);
+        if (matcher.find()) {
+            return new Integer(matcher.group(0));
+        } else {
+            return null;
+        }
+        */
+    }
+
+    public static String extractNameFromStreet(String street) {
+        Integer streetNumber = Address.extractNumberFromStreet(street);
+        if (streetNumber != null) {
+            return street.replaceFirst(streetNumber.toString(), "").trim();
+        } else {
+            return street;
+        }
     }
 
     @JsonCreator

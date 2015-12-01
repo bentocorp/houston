@@ -5,7 +5,7 @@ import javax.annotation.PostConstruct
 
 import com.mysql.jdbc.jdbc2.optional.MysqlDataSource
 import org.bentocorp.houston.config.BentoConfig
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 
@@ -63,4 +63,33 @@ class Database {
 
   // Need to fallback on DataSource because slick currently does not support "SELECT ... FOR UPDATE" queries
   def getDataSource = ds
+}
+
+// Use an abstract class instead of a trait because abstract classes are fully interoperable with Java & Updatable
+// requires constructor parameters
+abstract class Updatable(tableName: String) {
+
+  private val logger: Logger = LoggerFactory.getLogger(classOf[Updatable])
+
+  var database: Database
+
+  // Map keys must match column names exactly!
+  def update(pk: Long, cols: Map[String, String]): Int = {
+    var con: Connection = null
+    try {
+      // Try to obtain a connection from the pool
+      con = database.getDataSource.getConnection
+
+      val sql = "UPDATE `%s` SET %s WHERE pk_%s = %s" format (
+        tableName, cols.map({ case (k, v) => "`%s`='%s'" format (k, v.replaceAll("'", "\\'")) }).mkString(","), tableName, pk
+      )
+
+      logger.debug(sql)
+
+      con.prepareStatement(sql).executeUpdate()
+    } finally {
+      if (con != null) con.close()
+    }
+  }
+
 }

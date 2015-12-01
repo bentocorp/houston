@@ -7,7 +7,7 @@ public class OrderAction {
     public static final String SUBJECT = "order_action";
 
     public enum Type {
-        CREATE, ASSIGN, REPRIORITIZE, UNASSIGN, REASSIGN, UPDATE_STATUS, DELETE
+        CREATE, ASSIGN, REPRIORITIZE, UNASSIGN, REASSIGN, UPDATE_STATUS, DELETE, MODIFY
     }
 
     public OrderAction.Type type;
