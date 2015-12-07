@@ -179,7 +179,7 @@ class OrderManager {
   }
 
   @throws(classOf[Exception])
-  def updateStatus(orderId: String, status: Order.Status) = {
+  def updateStatus(orderId: String, status: Order.Status): Order[_] = {
     // First, get the order to make sure it exists
     val order = getOrder(orderId)
     try {
@@ -200,6 +200,7 @@ class OrderManager {
       } else {
         throw new Exception("Error updating status for order %s to %s" format (orderId, status))
       }
+      order
     } finally {
       // Important!
       redis.unlock(order.getLockId)

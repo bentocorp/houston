@@ -26,7 +26,9 @@ class WebMvcConfig extends WebMvcConfigurerAdapter {
     logger.debug("Adding custom interceptor - AuthenticationInterceptor")
     // a single asterisk matches 0 or more characters up to the occurrence of a "/" character which servers as a path
     // separator, while two (2) asterisks matches 0 or more characters including path separators
-    registry.addInterceptor(authenticationInterceptor).addPathPatterns("/**").excludePathPatterns("/error", "/api/authenticate", "/ping")
+    registry.addInterceptor(authenticationInterceptor)
+            .addPathPatterns("/**")
+            .excludePathPatterns("/error", "/api/authenticate", "/ping", "/admin/getForcedUpdateInfo")
     registry.addInterceptor(resyncInterceptor).addPathPatterns("/api/order/**", "/api/driver/**")
   }
 }

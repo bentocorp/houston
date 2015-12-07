@@ -433,8 +433,7 @@ class HttpController {
   @RequestMapping(Array("/order/accept"))
   def orderAccept(@RequestParam("orderId") orderId: String, @RequestParam("token") token: String) = {
     try {
-      val order = orderManager.getOrder(orderId)
-      orderManager.updateStatus(orderId, Order.Status.ACCEPTED)
+      val order = orderManager.updateStatus(orderId, Order.Status.ACCEPTED)
       val push = OrderStatus.make(orderId, Order.Status.ACCEPTED).from("houston").toGroup("atlas")
       send(push)
       // Let the customer know that a driver is on the way
