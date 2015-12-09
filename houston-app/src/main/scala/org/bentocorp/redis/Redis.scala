@@ -34,7 +34,7 @@ class Redis {
   @Autowired
   var config: BentoConfig = null
 
-  var redisClient: RedisClient = null
+  private var redisClient: RedisClient = null
 
   var redisson: Redisson = null
 
@@ -57,15 +57,21 @@ class Redis {
     val port = parts(1).toInt
     redisClient = new RedisClient(host, port)
     if (config.getBoolean("flush-redis")) {
-      Logger.info("!!ATTENTION!! Flushing database " + Redis.DB)
-      redisson.flushdb()
+      Logger.info("!!ATTENTION!! Flushing databases 8 & 9")
+      flushdb(List(8,9))
     }
+  }
+
+  def connect(db: Int): RedisConnection = {
+    val redisConnection = redisClient.connect()
+    val res0: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SELECT, new JInt(db))
+    redisConnection
   }
 
   private def redisKeyRaceQueue(key: String) = "race-queue_" + key
 
   def race(key: String, celebrate: () => Unit) {
-    val redisConnection = redisClient.connect()
+    val redisConnection = connect(9)
     val res0: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SELECT, new JInt(Redis.DB))
     var place: Long = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.INCR, key)
     if (place == 1) {
@@ -123,7 +129,17 @@ class Redis {
     lock.unlock()
   }
 
-  def flushdb() {
-    redisson.flushdb()
+  def flushdb(dbs: List[Int]) {
+    val redisConnection = redisClient.connect()
+    try {
+      var res0: Object = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.MULTI)
+      dbs foreach { i =>
+        res0 = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SELECT, new JInt(i))
+        res0 = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.FLUSHDB)
+      }
+      val res1: JList[Object] = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.EXEC)
+    } finally {
+      redisConnection.closeAsync()
+    }
   }
 }

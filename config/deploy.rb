@@ -34,8 +34,15 @@ set :deploy_to, '/sites/houston'
 # Default value for keep_releases is 5
 # set :keep_releases, 5
 
+require 'securerandom'
+
 namespace :deploy do
+
   after :finished, :cold_start do
+    set :deploy_id, SecureRandom.uuid
+    run_locally do
+      execute "echo '>> Set deploy_id=#{fetch(:deploy_id)}'"
+    end
     on roles(:all) do |host|
       invoke 'stop'
       invoke 'build'

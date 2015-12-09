@@ -11,8 +11,12 @@ import slick.lifted.{Tag, TableQuery}
 
 import scala.collection.JavaConversions._
 
-class TDriver(tag: Tag) extends Table[(Long, Option[String], Option[String], Option[String], Option[String], Byte,
-  Option[String], Option[String], Option[String], Option[Byte])](tag, "Driver") {
+object TDriver {
+  type Row = (Long, Option[String], Option[String], Option[String], Option[String], Byte, Option[String],
+    Option[String], Option[String], Option[Byte])
+}
+
+class TDriver(tag: Tag) extends Table[TDriver.Row](tag, "Driver") {
 
   def pk_Driver = column[Long]("pk_Driver", O.PrimaryKey, O.AutoInc)
 
@@ -55,6 +59,10 @@ class DriverDao extends IAuthDao {
     drivers
       .filter(r => r.deleted_at.isEmpty)
       .map(r => (r.pk_Driver, r.firstname, r.lastname, r.mobile_phone, r.status, r.order_queue)).list
+  }
+
+  def selectAllOnShift: List[TDriver.Row] = db() withSession { implicit session =>
+    drivers.filter(_.on_shift === 1.toByte).list
   }
 
   def updateOrderQueue(driverId: Long, queue: java.util.List[String]) = db() withSession { implicit session =>

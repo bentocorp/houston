@@ -3,7 +3,7 @@
     <appender name="stdout" class="ch.qos.logback.core.ConsoleAppender">
         <layout class="ch.qos.logback.classic.PatternLayout">
             <Pattern>
-                %d{yyyy-MM-dd HH:mm:ss, PST} [%thread] %-5level %logger{36} - %msg%n
+                %d{yyyy-MM-dd HH:mm:ss, PST} [%thread] %-5level %logger{36} \t %msg%n
             </Pattern>
         </layout>
     </appender>
@@ -28,6 +28,9 @@
 
     <appender name="file-error" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>/sites/houston/current/error.log</file>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>ERROR</level>
+        </filter>
         <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
             <Pattern>
                 %d{yyyy-MM-dd HH:mm:ss, PST} [%thread] %-5level %logger{36} - %msg%n
@@ -57,11 +60,7 @@
     <root level="error">
         <!-- Due to Logback "additivity", all descendant loggers may inherit these appenders. As a result, use filters
              to direct log messages to their appropriate destinations based on level. -->
-        <appender-ref ref="file-error">
-            <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-                <level>ERROR</level>
-            </filter>
-        </appender-ref>
+        <appender-ref ref="file-error"/>
         <appender-ref ref="file-audit"/>
         <appender-ref ref="stdout" />
     </root>

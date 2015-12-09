@@ -1,14 +1,14 @@
 package org.bentocorp.controllers
 
+import java.lang.{Integer => JInt}
 import java.security.SecureRandom
 import javax.annotation.PostConstruct
 import javax.net.ssl._
 
 import com.fasterxml.jackson.core.`type`.TypeReference
-import io.socket.client.{Manager, Ack, IO, Socket}
+import io.socket.client.{Ack, IO, Manager, Socket}
 import io.socket.emitter.Emitter.Listener
 import io.socket.engineio.client.{EngineIOException, Transport}
-import org.bentocorp.houston.util.{PhoneUtils, HttpUtils}
 import org.bentocorp._
 import org.bentocorp.api.APIResponse._
 import org.bentocorp.api.ws.{OrderAction, OrderStatus, Push, Stat}
@@ -16,9 +16,10 @@ import org.bentocorp.api.{APIResponse, Authenticate, Track}
 import org.bentocorp.aws.SQS
 import org.bentocorp.db.{Database, GenericOrderDao}
 import org.bentocorp.dispatch._
+import org.bentocorp.houston.app.service.SystemEta
 import org.bentocorp.houston.config.BentoConfig
-import org.bentocorp.mapbox.MapboxService
-import org.bentocorp.mapbox.WayPoint
+import org.bentocorp.houston.util.{HttpUtils, PhoneUtils}
+import org.bentocorp.mapbox.{MapboxService, WayPoint}
 import org.bentocorp.redis.Redis
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -49,6 +50,9 @@ class HttpController {
   var token = ""
 
   final var NODE_URL = ""
+
+  @Autowired
+  var systemEtaService: SystemEta = _
 
   @Autowired
   var phpService: PhpService = null
@@ -95,6 +99,7 @@ class HttpController {
               val drivers = driverManager.drivers.toMap
               drivers.values foreach { d => track(d.id) }
               SQS.start(HttpController.this)
+              systemEtaService.start(token)
             }
           }
         })
@@ -433,6 +438,7 @@ class HttpController {
   @RequestMapping(Array("/order/accept"))
   def orderAccept(@RequestParam("orderId") orderId: String, @RequestParam("token") token: String) = {
     try {
+      // TODO - Make sure order is assigned to this driver before accepting
       val order = orderManager.updateStatus(orderId, Order.Status.ACCEPTED)
       val push = OrderStatus.make(orderId, Order.Status.ACCEPTED).from("houston").toGroup("atlas")
       send(push)
@@ -481,6 +487,7 @@ class HttpController {
   @RequestMapping(Array("/order/reject"))
   def orderReject(@RequestParam("orderId") orderId: String, @RequestParam("token") token: String) = {
     try {
+      // TODO - Make sure order is assigned to this driver before rejecting
       orderManager.updateStatus(orderId, Order.Status.REJECTED)
       val push = OrderStatus.make(orderId, Order.Status.REJECTED).from("houston").toGroup("atlas")
       send(push)
@@ -495,6 +502,7 @@ class HttpController {
     // To be moved to Spring's authentication filters
     val driverId = token.split("-")(1).toLong
     try {
+      // TODO - Make sure order is assigned to this driver before completing
       orderManager.updateStatus(orderId, Order.Status.COMPLETE)
       driverManager.removeOrder(driverId, orderId)
       val push = OrderStatus.make(orderId, Order.Status.COMPLETE).from("houston").toGroup("atlas")
@@ -576,7 +584,7 @@ class HttpController {
   def flushdb() = {
     try {
       Logger.info("Flushing redis")
-      redis.flushdb()
+      redis.flushdb(List(8))
       success("OK")
     } catch {
       case e: Exception => error(1, e.getMessage)

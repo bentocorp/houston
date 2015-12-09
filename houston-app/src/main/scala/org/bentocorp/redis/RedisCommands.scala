@@ -10,4 +10,7 @@ object RedisCommands {
   final val SADD: RedisCommand[String] = new RedisCommand[String]("SADD", new StringReplayDecoder)
   final val SREM: RedisCommand[String] = new RedisCommand[String]("SREM", new StringReplayDecoder)
   final val DEL: RedisCommand[String] = new RedisCommand[String]("DEL", new StringReplayDecoder)
+  final val SELECT: RedisCommand[String] = new RedisCommand[String]("SELECT")
+  final val EXEC: RedisCommand[String] = new RedisCommand[String]("EXEC")
+  final val FLUSHDB: RedisCommand[String] = new RedisCommand[String]("FLUSHDB")
 }

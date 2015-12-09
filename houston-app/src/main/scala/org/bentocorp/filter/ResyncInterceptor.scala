@@ -1,11 +1,11 @@
 package org.bentocorp.filter
 
+import java.lang.{Integer => JInt}
 import java.text.SimpleDateFormat
-import java.util.{TimeZone, Calendar}
-import javax.annotation.PostConstruct
-import javax.servlet.http.{HttpServletResponse, HttpServletRequest}
-import org.bentocorp.dispatch.{OrderManager, DriverManager}
-import org.bentocorp.houston.config.BentoConfig
+import java.util.{Calendar, TimeZone}
+import javax.servlet.http.{HttpServletRequest, HttpServletResponse}
+
+import org.bentocorp.dispatch.{DriverManager, OrderManager}
 import org.bentocorp.redis.Redis
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -73,7 +73,7 @@ class ResyncInterceptor extends HandlerInterceptorAdapter {
     this.synchronized {
       if (lastResyncTs != resyncTs) {
         lastResyncTs = resyncTs // TODO - What to do with existing
-        redis.flushdb()
+        redis.flushdb(List(8))
         logger.debug("Resyncing orders")
         redis.race("OrderManager#init_" + resyncTs, () => { orderManager.syncOrders() })
         logger.debug("Resyncing drivers")

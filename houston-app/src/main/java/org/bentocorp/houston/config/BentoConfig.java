@@ -1,7 +1,5 @@
 package org.bentocorp.houston.config;
 
-import javax.annotation.PostConstruct;
-
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import com.typesafe.config.ConfigValueFactory;
@@ -11,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.PostConstruct;
 import java.util.List;
 
 @Component
@@ -37,9 +36,13 @@ public class BentoConfig {
         // Option to wipe Redis instance before running the Spring application
         boolean flushRedis = springEnvironment.getProperty("flush-redis") != null;
         boolean noAuth = springEnvironment.getProperty("no-auth") != null;
-        config = config.withValue("flush-redis", ConfigValueFactory.fromAnyRef(flushRedis))
-                .withValue("no-auth", ConfigValueFactory.fromAnyRef(noAuth))
-                .withValue("env", ConfigValueFactory.fromAnyRef(env));
+
+        String deployId = springEnvironment.getProperty("deploy-id");
+
+        config = config.withValue("deploy-id", ConfigValueFactory.fromAnyRef(deployId))
+                       .withValue("flush-redis", ConfigValueFactory.fromAnyRef(flushRedis))
+                       .withValue("no-auth", ConfigValueFactory.fromAnyRef(noAuth))
+                       .withValue("env", ConfigValueFactory.fromAnyRef(env));
     }
 
     public Config toTypesafeConfig() { return config; }
@@ -49,4 +52,6 @@ public class BentoConfig {
     public List<String> getStringList(String s) { return config.getStringList(s); }
 
     public boolean getBoolean(String s) { return config.getBoolean(s); }
+
+    public boolean getIsNull(String s) { return config.getIsNull(s); }
 }

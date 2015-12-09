@@ -47,9 +47,8 @@ class BentoAuthenticationProvider /* extends AuthenticationProvider */ {
 
   @PostConstruct
   def init() {
-    redisConnection = redis.redisClient.connect()
     // Tokens stored on Redis database 7
-    val res0: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SELECT, new JInt(Redis.AUTH_DB))
+    redisConnection = redis.connect(Redis.AUTH_DB)
   }
 
   def cacheKeyAccessToken(clientId: String) = "accessToken_" + clientId

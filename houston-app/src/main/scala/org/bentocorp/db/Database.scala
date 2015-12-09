@@ -81,7 +81,7 @@ abstract class Updatable(tableName: String) {
       con = database.getDataSource.getConnection
 
       val sql = "UPDATE `%s` SET %s WHERE pk_%s = %s" format (
-        tableName, cols.map({ case (k, v) => "`%s`='%s'" format (k, v.replaceAll("'", "\\'")) }).mkString(","), tableName, pk
+        tableName, cols.map({ case (k, v) => "`%s`='%s'" format (k, v.replaceAll("'", "\\\\'")) }).mkString(","), tableName, pk
       )
 
       logger.debug(sql)

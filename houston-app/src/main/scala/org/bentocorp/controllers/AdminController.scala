@@ -35,13 +35,9 @@ class AdminController {
   def fn0(@RequestParam(value = "device_id") deviceId: String,
           @RequestParam(value = "min_version"    , defaultValue = "") minVersion   : String,
           @RequestParam(value = "min_version_url", defaultValue = "") minVersionUrl: String): String = {
-    var redisClient: RedisClient = null
     var redisConnection: RedisConnection = null
     try {
-      val masterUrl = config.getString("redis.master")
-      val parts = masterUrl.split(":")
-      redisClient = new RedisClient(parts(0), parts(1).toInt)
-      redisConnection = redisClient.connect()
+      redisConnection = redis.connect(1)
       var res0: String = ""
       // TODO - Which database to use!?
       if (!minVersion.isEmpty)
@@ -55,21 +51,14 @@ class AdminController {
         error(1, e.getMessage)
     } finally {
       if (redisConnection != null) redisConnection.closeAsync()
-      if (redisClient != null) redisClient.shutdownAsync()
     }
   }
 
   @RequestMapping(Array("/getForcedUpdateInfo"))
   def bar(@RequestParam(value = "device_id") deviceId: String) = {
-    var redisClient: RedisClient = null
     var redisConnection: RedisConnection = null
     try {
-      val masterUrl = config.getString("redis.master")
-      val parts = masterUrl.split(":")
-      println(parts(0))
-      println(parts(1).toInt)
-      redisClient = new RedisClient(parts(0), parts(1).toInt)
-      redisConnection = redis.redisClient.connect()
+      redisConnection = redis.connect(1)
       var res = new java.util.HashMap[String, String]()
       var res0: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.GET, key(deviceId, "min_version"))
       res.put("min_version", res0)
@@ -83,7 +72,6 @@ class AdminController {
         error(1, e.getMessage)
     } finally {
       if (redisConnection != null) redisConnection.closeAsync()
-      if (redisClient != null) redisClient.shutdownAsync()
     }
   }
 }
