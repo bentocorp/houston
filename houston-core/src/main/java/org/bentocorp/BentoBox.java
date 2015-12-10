@@ -37,7 +37,7 @@ public class BentoBox {
 
         public enum Type {
             // Enum fields required for finer-grain control over how these values are stored in the database
-            MAIN("main"), SIDE("side"), ADD_ON("add_on");
+            MAIN("main"), SIDE("side"), ADD_ON("addon");
 
             String value;
 
