@@ -294,6 +294,10 @@ class HttpController {
 
       orderManager.update(order)
       send(OrderAction.make(OrderAction.Type.MODIFY, order, -1l, null).rid(rid).from("houston").toGroup("atlas"))
+      if (order.getDriverId != null && order.getDriverId > 0) {
+        send(OrderAction.make(OrderAction.Type.MODIFY, order, -1l, null).rid(rid).from("houston").toRecipient("d-" + order.getDriverId))
+
+      }
       success(order)
     } catch {
       case e: Exception =>

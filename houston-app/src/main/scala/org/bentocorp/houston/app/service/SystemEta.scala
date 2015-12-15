@@ -110,7 +110,7 @@ class SystemEta {
     var averageOrdersPerDriver: Double = orderCount/driverCount
 
     // Must be at least 1
-    averageOrdersPerDriver = if (averageOrdersPerDriver <= 0) 1.0 else averageOrdersPerDriver
+    averageOrdersPerDriver = if (averageOrdersPerDriver <= 1) 1.0 else averageOrdersPerDriver
 
     val res: Int = roundToNearestMinutes(averageOrdersPerDriver * multiplier, SystemEta.ROUND_TO_NEAREST_MINUTE)
     logger.debug("orderCount=%s, driverCount=%s, average=%s, multiplier=%s, SSE=%s" format (
