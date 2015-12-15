@@ -172,7 +172,7 @@ class SystemEta {
             }
           }
         } catch {
-          case e: Exception => logger.error(e.getMessage, e.getStackTrace)
+          case e: Exception => logger.error(e.getMessage, e)
         } finally {
           redisConnection.closeAsync()
         }
