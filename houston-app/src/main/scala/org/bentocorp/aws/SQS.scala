@@ -73,8 +73,8 @@ class SQS(controller: HttpController) extends Thread {
       }
       for (m: Message <- messages) {
         val body = mapper.readValue(m.getBody, classOf[MessageBody])
-        val awsOrder = mapper.readValue(body.data, classOf[Order])
         Logger.debug(body.data)
+        val awsOrder = mapper.readValue(body.data, classOf[Order])
         val order = org.bentocorp.Order.parse(awsOrder)
 
         Logger.debug("Got " + order.id)

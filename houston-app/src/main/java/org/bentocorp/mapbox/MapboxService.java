@@ -20,6 +20,7 @@ public class MapboxService {
       if (wayPoints.length < 2) throw new Exception("There must be at least two (2) way points to get an ETA");
       String wayPointStr = wayPoints[0].toString();
       for (int i = 1; i < wayPoints.length; i++) {
+        // TODO - Handle NullPointException here
         wayPointStr += ";" + wayPoints[i].toString();
       }
       String url = "https://api.mapbox.com/v4/directions/mapbox.driving/" + wayPointStr +

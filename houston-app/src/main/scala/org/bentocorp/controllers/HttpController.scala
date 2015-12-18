@@ -176,7 +176,7 @@ class HttpController {
             val ex = args(0).asInstanceOf[EngineIOException]
             transportLogger.error(
               "Transport (%s) error - %s" format (transport.name, ex.getMessage),
-              ex.getStackTrace
+              ex
             )
           }
         })
@@ -301,7 +301,7 @@ class HttpController {
       success(order)
     } catch {
       case e: Exception =>
-        Logger.error(e.getMessage, e.getStackTrace)
+        Logger.error(e.getMessage, e)
         error(1, e.getMessage)
     }
   }
@@ -454,6 +454,7 @@ class HttpController {
           "Hi!\n"
         }
       }
+      /*
       val eta =
         try {
           // At this point, log any Exceptions but otherwise return a successful response
@@ -480,7 +481,8 @@ class HttpController {
             Logger.error(ex.getMessage, ex)
             30 // Default to 30 minutes
         }
-      val msg = greeting + "Your Bento server is about %s minutes away. Thanks for being patient and enjoy your Bento!" format eta
+        */
+      val msg = greeting + "Hi %s,\nYour Bento server is about 15-25 minutes away. You’ll receive another text message shortly when they arrive." format order.firstName
       smsSender.send(order.phone, msg)
       success("OK")
     } catch {
