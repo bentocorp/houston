@@ -99,6 +99,7 @@ class HttpController {
               val drivers = driverManager.drivers.toMap
               drivers.values foreach { d => track(d.id) }
               SQS.start(HttpController.this)
+              // TODO - There should be an elegant way to update token for background services
               systemEtaService.start(token)
             }
           }

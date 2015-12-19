@@ -140,11 +140,11 @@ class SystemEta {
   }
 
   def start(token: String): Boolean = {
+    this.token = token
     if (thread != null && thread.isAlive) {
       logger.info("System ETA service is already running!")
       return false
     }
-    this.token = token
     val runnable = new Runnable {
       override def run() {
         val redisConnection = redis.connect(9)
