@@ -43,7 +43,7 @@ class RMap[K: Manifest, V: Manifest](redisClient: RedisClient, name: String) {
       val key = k.next()
       val value = v.next()
       if (value == null) {
-        throw new Exception("Error - got null value for key " + key + " from Redis")
+        throw new Exception("Error - got null value for key " + redisKeyMapEntry(key) + " from Redis")
       }
 
       val m = manifest[V]

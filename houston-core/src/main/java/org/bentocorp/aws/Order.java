@@ -10,8 +10,9 @@ public class Order {
     @JsonProperty("pk_Order")
     public long orderId;
 
-    @JsonProperty("OrderItems")
-    public BentoBox[] items;
+    // Don't bother deserializing the Bento ourselves since the introduction of add-ons
+//    @JsonProperty("OrderItems")
+    public BentoBox[] items = new BentoBox[0];
 
     @JsonProperty("OrderDetails")
     public OrderDetails details;

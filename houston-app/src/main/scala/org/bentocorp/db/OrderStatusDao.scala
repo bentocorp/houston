@@ -6,11 +6,12 @@ import org.springframework.beans.factory.annotation.Autowired
 import slick.driver.MySQLDriver.simple._
 import slick.lifted.{Tag, TableQuery}
 
-class TOrderStatus(tag: Tag) extends Table[(Option[Long], Option[Long], Option[String])](tag, "OrderStatus") {
+class TOrderStatus(tag: Tag) extends Table[(Option[Long], Option[Long], Option[String], Option[String])](tag, "OrderStatus") {
   def fk_Order = column[Option[Long]]("fk_Order")
   def fk_Driver = column[Option[Long]]("fk_Driver")
   def status = column[Option[String]]("status")
-  def * = (fk_Order, fk_Driver, status)
+  def driver_text_blob = column[Option[String]]("driver_text_blob")
+  def * = (fk_Order, fk_Driver, status, driver_text_blob)
 }
 
 class OrderStatusDao {

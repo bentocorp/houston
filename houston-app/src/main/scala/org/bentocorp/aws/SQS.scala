@@ -53,6 +53,7 @@ class SQS(controller: HttpController) extends Thread {
 
   var config: BentoConfig = controller.config
   val url = config.getString("aws.sqs.url")
+  Logger.debug("Listening for incoming orders on queue: " + url)
     val credentials: AWSCredentials = new BasicAWSCredentials(
       config.getString("aws.id"), config.getString("aws.secret"))
     sqs = new AmazonSQSClient(credentials)

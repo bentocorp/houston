@@ -95,7 +95,7 @@ class OrderManager {
     val orders = MMap.empty[Long, Order[Bento]]
     Logger.info("Fetching orders created on or after %s" format DATE_FORMATTER.format(startOfToday))
     orderDao.select(startOfToday) foreach {
-      case (orderId, Some(firstname), Some(lastname), Some(phone), numberOpt, Some(street), Some(city), Some(state), zipCodeOpt, Some(lat), Some(lng), Some(main), Some(side1), Some(side2), Some(side3), Some(side4), Some(statusStr), driverIdOpt, notesOpt) =>
+      case (orderId, Some(firstname), Some(lastname), Some(phone), numberOpt, Some(street), Some(city), Some(state), zipCodeOpt, Some(lat), Some(lng), /*Some(main), Some(side1), Some(side2), Some(side3), Some(side4),*/ Some(statusStr), driverIdOpt, notesOpt, Some(driverTextBlob)) =>
         val status = Order.Status.parse(statusStr)
         if (status == Order.Status.CANCELLED) {
           Logger.debug("Ignoring %s order %s" format (status, orderId))
@@ -112,13 +112,14 @@ class OrderManager {
                 val driverId = if (driverIdOpt.isDefined && driverIdOpt.get > 0) new java.lang.Long(driverIdOpt.get) else null
                 newOrder.setDriverIdWithStatus(driverId, status)
                 newOrder.notes = notesOpt.getOrElse("")
+                newOrder.orderString = driverTextBlob
                 orders += orderId -> newOrder
                 newOrder
             }
           }
-          val bentoBox = (new BentoBox).add(dishes(main)).add(dishes(side1)).add(dishes(side2)).add(dishes(side3)).add(dishes(side4))
+          //val bentoBox = (new BentoBox).add(dishes(main)).add(dishes(side1)).add(dishes(side2)).add(dishes(side3)).add(dishes(side4))
           // The order item here is a Bento (which is an Array of BentoBox)
-          order.item.add(bentoBox)
+          //order.item.add(bentoBox)
         }
       case row =>
         throw new Exception("Bad order row - " + row)
@@ -149,6 +150,7 @@ class OrderManager {
           val driverId = if (driverIdOpt.isDefined && driverIdOpt.get > 0) new java.lang.Long(driverIdOpt.get) else new java.lang.Long(-1L)
           order.setDriverIdWithStatus(driverId, status)
           order.notes = notesOpt.getOrElse("")
+          order.orderString = body
           genericOrders += (orderId -> order)
         }
       case row =>
