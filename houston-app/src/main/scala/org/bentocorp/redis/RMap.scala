@@ -7,6 +7,7 @@ import org.bentocorp.{Json, ScalaJson}
 import org.redisson.client.RedisClient
 import org.redisson.client.codec.StringCodec
 import org.redisson.client.protocol.{RedisCommands => RedissonRedisCommands}
+import org.slf4j.LoggerFactory
 
 import scala.collection.mutable.{Map => MMap}
 import scala.reflect.ClassTag
@@ -18,7 +19,7 @@ import java.util.{List => JList}
 import java.lang.{Integer => JInt}
 
 class RMap[K: Manifest, V: Manifest](redisClient: RedisClient, name: String) {
-
+  val logger = LoggerFactory.getLogger(this.getClass)
   private def redisKeyMapEntry(key: String) = name + "_" + key
 
   @throws(classOf[Exception])
@@ -39,11 +40,13 @@ class RMap[K: Manifest, V: Manifest](redisClient: RedisClient, name: String) {
 //    println("GET count(res0)=%s" format values.size)
     val k = keys.iterator
     val v = values.iterator
+    var error = false;
     while (v.hasNext) {
       val key = k.next()
       val value = v.next()
       if (value == null) {
-        throw new Exception("Error - got null value for key " + redisKeyMapEntry(key) + " from Redis")
+        logger.error("Error - Got null value for key " + redisKeyMapEntry(key) + " from Redis");
+        error = true;
       }
 
       val m = manifest[V]
@@ -56,6 +59,9 @@ class RMap[K: Manifest, V: Manifest](redisClient: RedisClient, name: String) {
           ScalaJson.parse(value, typeInfo)
         }
       result += (key.asInstanceOf[K] -> parsed)
+    }
+    if (error) {
+      throw new Exception("Error calling RMap.toMap for " + name)
     }
     result
   }
