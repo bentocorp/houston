@@ -2,6 +2,7 @@ package org.bentocorp.aws;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.bentocorp.Bento;
 import org.bentocorp.BentoBox;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -11,8 +12,8 @@ public class Order {
     public long orderId;
 
     // Don't bother deserializing the Bento ourselves since the introduction of add-ons
-//    @JsonProperty("OrderItems")
-    public BentoBox[] items = new BentoBox[0];
+    @JsonProperty("OrderItems")
+    public Bento.BentoObjectWrapper[] items;
 
     @JsonProperty("OrderDetails")
     public OrderDetails details;

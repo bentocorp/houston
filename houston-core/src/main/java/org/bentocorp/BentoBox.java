@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class BentoBox {
+public class BentoBox extends Bento.BentoObjectWrapper {
 
     public List<Item> items = new ArrayList<Item>();
 

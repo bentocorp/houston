@@ -46,10 +46,10 @@ class OrderDao extends Updatable("Order") {
     val res =
       for {
         o <- order
-//        b <- customerBentoBox
+        b <- customerBentoBox
         u <- user
         s <- status
-        if /*o.pk_Order === b.fk_Order &&*/ o.fk_User === u.pk_User && o.pk_Order === s.fk_Order &&
+        if o.pk_Order === b.fk_Order && o.fk_User === u.pk_User && o.pk_Order === s.fk_Order &&
           ((s.status =!= Order.Status.CANCELLED.toString && s.status =!= Order.Status.COMPLETE.toString) || o.created_at >= day)
       } yield {(
         o.pk_Order,
@@ -63,11 +63,11 @@ class OrderDao extends Updatable("Order") {
         o.zip,
         o.lat,
         o.long,
-//        b.fk_main,
-//        b.fk_side1,
-//        b.fk_side2,
-//        b.fk_side3,
-//        b.fk_side4,
+        b.fk_main,
+        b.fk_side1,
+        b.fk_side2,
+        b.fk_side3,
+        b.fk_side4,
         s.status,
         s.fk_Driver,
         o.notes_for_driver,

@@ -73,7 +73,7 @@ public class Order<T> {
         address.lat = o.details.coords.lat;
         address.lng = o.details.coords.lng;
         Bento bentoOrder = new Bento();
-        for (BentoBox box: o.items) {
+        for (Bento.BentoObjectWrapper box: o.items) {
             bentoOrder.add(box);
         }
         Order<Bento> order = new Order<Bento>(

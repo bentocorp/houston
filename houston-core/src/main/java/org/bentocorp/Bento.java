@@ -1,16 +1,27 @@
 package org.bentocorp;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import java.util.ArrayList;
-import java.util.List;
 
-public class Bento extends ArrayList<BentoBox> {
+public class Bento extends ArrayList<Bento.BentoObjectWrapper> {
+
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "item_type")
+    @JsonSubTypes({
+            @JsonSubTypes.Type(value = BentoBox.class, name = "CustomerBentoBox"),
+            @JsonSubTypes.Type(value = AddOnList.class, name = "AddonList")
+    })
+    public static abstract class BentoObjectWrapper {
+        // For polymorphic-type deserialization purposes
+    }
 
     public Bento() {
         super();
     }
 
+    /*
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder("");
@@ -34,4 +45,5 @@ public class Bento extends ArrayList<BentoBox> {
         }
         return builder.toString();
     }
+    */
 }

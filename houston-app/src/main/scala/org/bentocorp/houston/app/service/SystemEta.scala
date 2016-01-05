@@ -9,7 +9,7 @@ import org.bentocorp.houston.config.BentoConfig
 import org.bentocorp.houston.util.HttpUtils
 import org.bentocorp.redis.{RMap, Redis}
 import org.bentocorp.{ScalaJson, Bento, Order}
-import org.redisson.client.RedisConnection
+import org.redisson.client.{RedisTimeoutException, RedisConnection}
 import org.redisson.client.codec.StringCodec
 import org.redisson.client.protocol.RedisCommands
 import org.slf4j.{Logger, LoggerFactory}
@@ -148,9 +148,11 @@ class SystemEta {
     val runnable = new Runnable {
       override def run() {
         val redisConnection = redis.connect(9)
+        var start = 0L
         try {
           while (continue) {
             logger.debug("Waiting in line")
+            start = System.currentTimeMillis
             // 0 - Block indefinitely until data becomes available
             var res0: Object = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.BLPOP, SystemEta.QUEUE_NAME, new JInt(0))
 
@@ -172,6 +174,9 @@ class SystemEta {
             }
           }
         } catch {
+          case timeoutException: RedisTimeoutException =>
+            val dt = (System.currentTimeMillis - start)/1000.0
+            logger.error(timeoutException.getMessage + " - dt: " + dt + " sec.", timeoutException)
           case e: Exception => logger.error(e.getMessage, e)
         } finally {
           redisConnection.closeAsync()

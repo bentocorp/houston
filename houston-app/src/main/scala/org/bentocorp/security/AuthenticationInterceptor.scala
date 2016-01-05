@@ -33,6 +33,7 @@ class AuthenticationInterceptor extends HandlerInterceptorAdapter {
   // Intercept any request for a protected resource
   override def preHandle(request: HttpServletRequest, response: HttpServletResponse, handler: Object): Boolean = {
     if (noAuth) {
+      // TODO - We still need to set the token and clientId here
       return true
     }
     val url = request.getRequestURL.toString
