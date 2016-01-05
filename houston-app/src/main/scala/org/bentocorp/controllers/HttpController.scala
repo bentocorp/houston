@@ -443,7 +443,12 @@ class HttpController {
   @RequestMapping(Array("/order/accept"))
   def orderAccept(@RequestParam("orderId") orderId: String, @RequestParam("token") token: String) = {
     try {
-      // TODO - Make sure order is assigned to this driver before accepting
+      // TODO - This check is not foolproof because another thread may be in the process of modifying the order
+      val actingDriverId = token.split("-")(1).toLong
+      val orderDriverId = orderManager.getOrder(orderId).getDriverId
+      if (orderDriverId != actingDriverId) {
+        throw new Exception("Error - This order is assigned to a different driver (%s)" format orderDriverId)
+      }
       val order = orderManager.updateStatus(orderId, Order.Status.ACCEPTED)
       val push = OrderStatus.make(orderId, Order.Status.ACCEPTED).from("houston").toGroup("atlas")
       send(push)
@@ -494,7 +499,12 @@ class HttpController {
   @RequestMapping(Array("/order/reject"))
   def orderReject(@RequestParam("orderId") orderId: String, @RequestParam("token") token: String) = {
     try {
-      // TODO - Make sure order is assigned to this driver before rejecting
+      // TODO - This check is not foolproof because another thread may be in the process of modifying the order
+      val actingDriverId = token.split("-")(1).toLong
+      val orderDriverId = orderManager.getOrder(orderId).getDriverId
+      if (orderDriverId != actingDriverId) {
+        throw new Exception("Error - This order is assigned to a different driver (%s)" format orderDriverId)
+      }
       orderManager.updateStatus(orderId, Order.Status.REJECTED)
       val push = OrderStatus.make(orderId, Order.Status.REJECTED).from("houston").toGroup("atlas")
       send(push)
@@ -509,7 +519,12 @@ class HttpController {
     // To be moved to Spring's authentication filters
     val driverId = token.split("-")(1).toLong
     try {
-      // TODO - Make sure order is assigned to this driver before completing
+      // TODO - This check is not foolproof because another thread may be in the process of modifying the order
+      val actingDriverId = token.split("-")(1).toLong
+      val orderDriverId = orderManager.getOrder(orderId).getDriverId
+      if (orderDriverId != actingDriverId) {
+        throw new Exception("Error - This order is assigned to a different driver (%s)" format orderDriverId)
+      }
       orderManager.updateStatus(orderId, Order.Status.COMPLETE)
       driverManager.removeOrder(driverId, orderId)
       val push = OrderStatus.make(orderId, Order.Status.COMPLETE).from("houston").toGroup("atlas")
