@@ -6,6 +6,7 @@ import javax.annotation.PostConstruct
 import javax.net.ssl._
 
 import com.fasterxml.jackson.core.`type`.TypeReference
+import com.twilio.sdk.TwilioRestException
 import io.socket.client.{Ack, IO, Manager, Socket}
 import io.socket.emitter.Emitter.Listener
 import io.socket.engineio.client.{EngineIOException, Transport}
@@ -492,7 +493,11 @@ class HttpController {
       smsSender.send(order.phone, msg)
       success("OK")
     } catch {
-      case e: Exception => error(1, e.getMessage)
+      case twilioRestException: TwilioRestException =>
+        error(2, twilioRestException.getMessage)
+      case e: Exception =>
+        Logger.error(e.getMessage, e)
+        error(1, e.getMessage)
     }
   }
 
@@ -543,6 +548,8 @@ class HttpController {
       smsSender.send(order.phone, str)
       success("OK")
     } catch {
+      case twilioRestException: TwilioRestException =>
+        error(2, twilioRestException.getMessage)
       case e: Exception =>
         Logger.error(e.getMessage, e)
         error(1, e.getMessage)
@@ -561,6 +568,8 @@ class HttpController {
       smsSender.send(order.phone, msg)
       success("OK")
     } catch {
+      case twilioRestException: TwilioRestException =>
+        error(2, twilioRestException.getMessage)
       case e: Exception =>
         Logger.error(e.getMessage, e)
         error(1, e.getMessage)
