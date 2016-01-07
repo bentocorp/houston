@@ -19,51 +19,57 @@ import java.util.{List => JList}
 import java.lang.{Integer => JInt}
 
 class RMap[K: Manifest, V: Manifest](redisClient: RedisClient, name: String) {
+
   val logger = LoggerFactory.getLogger(this.getClass)
+
   private def redisKeyMapEntry(key: String) = name + "_" + key
 
   @throws(classOf[Exception])
   def toMap: MMap[K, V] = {
     val redisConnection = redisClient.connect()
-    var res0: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SELECT, new JInt(Redis.DB))
-    val result = MMap.empty[K, V]
-    val keys: JList[String] = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SMEMBERS, name)
-//    println("RMap(%s)#toMap - %s" format (name, keys.size))
-    // Since you can't operate on data obtained in the middle of a transaction, this method will throw an Exception if
-    // a change in the map is detected after the key set has been retrieved
-    res0 = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.MULTI)
-    for (key <- keys) {
-      res0 = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.GET, redisKeyMapEntry(key))
-    }
-    val values: JList[String] = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.EXEC)
-    redisConnection.closeAsync() // TODO - Should be in a try/catch/finally block
-//    println("GET count(res0)=%s" format values.size)
-    val k = keys.iterator
-    val v = values.iterator
-    var error = false;
-    while (v.hasNext) {
-      val key = k.next()
-      val value = v.next()
-      if (value == null) {
-        logger.error("Error - Got null value for key " + redisKeyMapEntry(key) + " from Redis");
-        error = true;
-      }
+    try {
+      var res0: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SELECT, new JInt(Redis.DB))
+      val result = MMap.empty[K, V]
 
-      val m = manifest[V]
-      val parsed: V =
-        if (m.typeArguments.isEmpty) {
-          ScalaJson.parse(value, m.runtimeClass).asInstanceOf[V]
-        } else {
-          val parameterTypes = m.typeArguments.map(_.runtimeClass).toSeq
-          val typeInfo = ScalaJson.TypeFactory.constructParametrizedType(m.runtimeClass, m.runtimeClass, parameterTypes: _*)
-          ScalaJson.parse(value, typeInfo)
+      // Since you can't operate on data obtained in the middle of a transaction, a change in the map (specifically the
+      // key set) can cause this function to fail due to inconsistent data such as values that do not exist (null) for
+      // a given key. Consequently, we must use a Lua script (Redis executes the script transactionally).
+      val delimiter = "_,,,_" // Try to use a unique delimiter
+      val luaScript =
+        s"""
+          |local keys = redis.call('smembers', '$name')
+          |local vals = { }
+          |for i, k in ipairs(keys) do
+          |  vals[i] = k .. '$delimiter' .. redis.call('get', '${name}_' .. k)
+          |end
+          |return vals
+        """.stripMargin
+      val ret: JList[String] = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.EVAL_LIST, luaScript, new JInt(0))
+
+      ret foreach { str =>
+        // First extract key/value from Redis string
+        val parts = str.split(delimiter)
+        if (parts.length != 2) {
+          throw new Exception(s"Error trying to recreate map $name using Lua script on line $str")
         }
-      result += (key.asInstanceOf[K] -> parsed)
+        val key = parts(0)
+        val value = parts(1)
+        // Then deserialize into objects
+        val m = manifest[V]
+        val parsed: V =
+          if (m.typeArguments.isEmpty) {
+            ScalaJson.parse(value, m.runtimeClass).asInstanceOf[V]
+          } else {
+            val parameterTypes = m.typeArguments.map(_.runtimeClass).toSeq
+            val typeInfo = ScalaJson.TypeFactory.constructParametrizedType(m.runtimeClass, m.runtimeClass, parameterTypes: _*)
+            ScalaJson.parse(value, typeInfo)
+          }
+        result += (key.asInstanceOf[K] -> parsed)
+      }
+      result
+    } finally {
+      redisConnection.closeAsync()
     }
-    if (error) {
-      throw new Exception("Error calling RMap.toMap for " + name)
-    }
-    result
   }
 
   def += (keyValue: (K, V)) {
