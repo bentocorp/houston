@@ -93,7 +93,7 @@ class OrderManager {
     // in the databases
     val startOfToday = new Timestamp(calendar.getTimeInMillis)
     val orders = MMap.empty[Long, Order[Bento]]
-    Logger.info("Fetching orders created on or after %s" format DATE_FORMATTER.format(startOfToday))
+    Logger.info("Fetching orders created on or after %s (%s)" format (DATE_FORMATTER.format(startOfToday), startOfToday.getTime))
     orderDao.select(startOfToday) foreach {
       case (orderId, Some(firstname), Some(lastname), Some(phone), numberOpt, Some(street), Some(city), Some(state), zipCodeOpt, Some(lat), Some(lng), mainOpt, side1Opt, side2Opt, side3Opt, side4Opt, Some(statusStr), driverIdOpt, notesOpt, Some(driverTextBlob)) =>
         val status = Order.Status.parse(statusStr)
@@ -131,7 +131,7 @@ class OrderManager {
     /* generic orders */
 
     val genericOrders = MMap.empty[Long, Order[String]]
-    Logger.info("Fetching generic orders created on or after %s" format DATE_FORMATTER.format(startOfToday))
+    Logger.info("Fetching generic orders created on or after %s (%s)" format (DATE_FORMATTER.format(startOfToday), startOfToday.getTime))
     genericOrderDao.select(startOfToday) foreach {
       // Note: Since "name" was split into "firstname" and "lastname", lastname may be null and that case must be
       // accounted for
