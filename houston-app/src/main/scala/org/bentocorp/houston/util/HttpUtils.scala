@@ -61,12 +61,14 @@ object HttpUtils {
     def verify(hostname: String, session: SSLSession) = true
   }
 
-  def get(url: String, params: Map[String, Any], errorOnFailure: Boolean = false): String = {
+  def get(url: String, params: Map[String, Any], errorOnFailure: Boolean = false, logEndPoint: Boolean = true): String = {
     val queryString = (params map {
       case (key, value) => URLEncoder.encode(key, "UTF-8") + "=" + URLEncoder.encode(value.toString, "UTF-8")
     }).mkString("&")
     val endpoint = url + "?" + queryString
-    LOGGER.debug(endpoint)
+    if (logEndPoint) {
+      LOGGER.debug(endpoint)
+    }
     val res = client.execute(new HttpGet(endpoint))
     val statusCode = res.getStatusLine.getStatusCode
     if (statusCode != 200) {

@@ -7,6 +7,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
 import java.util.List;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class AddOnList extends Bento.BentoObjectWrapper {
 
     public List<AddOn> items = new ArrayList<AddOn>();

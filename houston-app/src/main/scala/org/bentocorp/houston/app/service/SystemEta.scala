@@ -119,10 +119,11 @@ class SystemEta {
     if (settingsDao.update(SystemEta.KEY_SSE_RESULT, res.toString) <= 0) {
       throw new Exception("Error - Problem persisting SSE=%s to MySQL" format res)
     }
+    // Because this occurs so frequently, don't log endpoint
     val str = HttpUtils.get(
       config.getString("node.url") + "/api/push",
       Map("from" -> "houston", "to" -> "\"atlas\"", "subject" -> "sse_update",
-        "body" -> res, "token" -> token))
+        "body" -> res, "token" -> token), logEndPoint = false)
   }
 
   def roundToNearestMinutes(d: Double, minute: Int): Int = {
