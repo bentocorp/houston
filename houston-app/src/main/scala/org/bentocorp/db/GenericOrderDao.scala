@@ -96,6 +96,8 @@ class GenericOrderDao extends Updatable("generic_Order") {
     if (lng.isDefined) address.lng = lng.get.toFloat
     val order = new Order[String]("g-" + orderId.get, firstname.get, lastname.get, phone.get, address, body.get)
     order.notes = notes.getOrElse("")
+    // For consistency (as with Bento orders), set orderString property
+    order.orderString = order.item
     order
   }
 
