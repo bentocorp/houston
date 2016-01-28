@@ -3,6 +3,7 @@ package org.bentocorp.dispatch;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.commons.lang3.StringUtils;
+import org.bentocorp.Shift;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,11 +26,31 @@ public class Driver {
     private Status status;
     private List<String> orderQueue = new ArrayList<String>();
 
-    public Driver(long id, String name, String phone, Status status) {
+    /* Order Ahead */
+
+    // Overall delivery speed (forwarded to Routific in JSON for routing)
+    public enum Speed {
+
+        FASTER(1.50F), FAST(1.25F), NORMAL(1.00F), SLOW(0.75F), VERY_SLOW(0.50F), BIKE(0.25F);
+
+        public float value; // Raw value may be from 0.1 to 2 (inclusively)
+
+        Speed(float value) {
+            this.value = value;
+        }
+    }
+
+    public float speed = Speed.NORMAL.value;
+
+    public Shift.Type shiftType;
+
+    public Driver(long id, String name, String phone, Status status, Shift.Type shiftType) {
         this.id = id;
         this.name = name;
         this.phone = phone;
+        // TODO - Remove status flag since we don't need it anymore if we re-track with Node after syncing
         this.status = status;
+        this.shiftType = shiftType;
     }
 
     @JsonProperty("orderQueue")

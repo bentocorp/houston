@@ -1,19 +1,24 @@
 package org.bentocorp.controllers
 
-import javax.annotation.PostConstruct
+import java.sql.Timestamp
+import java.text.SimpleDateFormat
+import java.util.TimeZone
 
-import org.bentocorp.ScalaJson
+import org.bentocorp.Order
+import org.bentocorp.api.APIResponse._
+import org.bentocorp.db.{Database, TOrder, TOrderStatus}
 import org.bentocorp.houston.config.BentoConfig
-import org.bentocorp.redis.{RedisCommands, Redis}
-import org.redisson.client.{RedisClient, RedisConnection}
+import org.bentocorp.houston.util.TimeUtils
+import org.bentocorp.redis.{Redis, RedisCommands}
+import org.redisson.client.RedisConnection
 import org.redisson.client.codec.StringCodec
+import org.redisson.client.protocol.{RedisCommands => RedissonRedisCommands}
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.stereotype.Controller
-import org.springframework.web.bind.annotation.{RequestParam, RequestMapping, RestController}
-import org.redisson.client.protocol.{RedisCommands => RedissonRedisCommands}
+import org.springframework.web.bind.annotation.{RequestMapping, RequestParam, RestController}
 
-import org.bentocorp.api.APIResponse._
+import scala.slick.driver.MySQLDriver.simple._
+import scala.slick.lifted.TableQuery
 
 @RestController
 @RequestMapping(Array("/admin"))
@@ -26,6 +31,72 @@ class AdminController {
 
   @Autowired
   var config: BentoConfig = null
+
+  @Autowired
+  var database: Database = _
+
+  @RequestMapping(Array("/mockOrderAhead"))
+  def mockOrderAhead(@RequestParam("start") startStr: String,
+                     @RequestParam("end")   endStr  : String,
+                     @RequestParam(value = "mod" , defaultValue = "1") mod : Int,
+                     @RequestParam(value = "dt"  , defaultValue = "0") dt  : String,
+                     @RequestParam(value = "exec", defaultValue = "false") exec: Boolean): String = {
+
+    val orderTable = TableQuery[TOrder]
+
+    val orderStatusTable = TableQuery[TOrderStatus]
+
+    val formatStr = "yyyy-MM-dd HH:mm"
+    val start = TimeUtils.parseTimestamp(startStr, formatStr, "PST") // assume PST
+    val end = TimeUtils.parseTimestamp(endStr, formatStr, "PST") // assume PST
+
+    val res = new StringBuffer("=)<br/>")
+
+    database() withSession { implicit session =>
+      val orders = orderTable.filter(r => r.created_at >= start && r.created_at < end).list
+
+      val f = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS Z")
+      f.setTimeZone(TimeZone.getTimeZone("PST"))
+
+      val offset: Long = dt.toInt * (1000L * 60 * 60 * 24) // offset in days
+
+      orders foreach { order =>
+        if (order._1 % mod == 0) {
+          val full: Long = 3600000L//1800000L
+          val half: Long = full/2
+          // round created_at to the nearest 30 minutes
+          val windowStart = new Timestamp(
+            (((order._3.get.getTime + half) / full) * full) + offset
+          )
+          val windowEnd = new Timestamp(windowStart.getTime + full) // each window is 30 minutes long
+
+          // Sometimes the rounding will result in windows outside of regular shift hours so we have to ignore those
+          val wT = TimeUtils.getLocalTime(windowEnd.getTime, TimeZone.getTimeZone("PST"))
+          val eT = TimeUtils.getLocalTime(end.getTime, TimeZone.getTimeZone("PST"))
+
+          if (wT.equals(eT) || wT.isBefore(eT)) {
+
+            res.append("%s: %s -> %s, %s" format (order._1, f.format(order._3.get), f.format(windowStart), f.format(windowEnd)))
+
+            if (exec) {
+
+              orderTable.filter(_.pk_Order === order._1)
+                        .map(r => (r.order_type, r.scheduled_timezone, r.scheduled_window_start, r.scheduled_window_end))
+                        .update(Some(2), Some("America/Los_Angeles"), Some(windowStart), Some(windowEnd))
+
+              orderStatusTable.filter(_.fk_Order === order._1)
+                              .map(r => (r.fk_Driver, r.status))
+                              .update((Some(-1), Some(Order.Status.UNASSIGNED.toString)))
+
+              res.append(" *EXECUTED*")
+            }
+            res.append("<br/>")
+          }
+        }
+      }
+    }
+    res.toString
+  }
 
   def key(deviceId: String, property: String) = {
     "admin_" + deviceId + "-" + property

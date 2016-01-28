@@ -1,5 +1,7 @@
 package org.bentocorp.aws
 
+import java.util.TimeZone
+
 import com.amazonaws.AbortedException
 import com.amazonaws.auth.{BasicAWSCredentials, AWSCredentials}
 import com.amazonaws.regions.{Regions, Region}
@@ -14,7 +16,7 @@ import org.bentocorp._
 import org.bentocorp.controllers.HttpController
 import org.bentocorp.dispatch.OrderManager
 import org.bentocorp.houston.config.BentoConfig
-import org.bentocorp.houston.util.HttpUtils
+import org.bentocorp.houston.util.{TimeUtils, HttpUtils}
 import org.slf4j.LoggerFactory
 import scala.collection.JavaConversions._
 
@@ -81,7 +83,15 @@ class SQS(controller: HttpController) extends Thread {
         Logger.debug("Got " + order.id)
 
         if (!orderManager.orders.contains(order.getOrderKey)) {
-          orderManager.orders += (order.getOrderKey -> order)
+
+          // Only load into cache if not Order Ahead or if scheduled to be delivered today
+          val start = TimeUtils.getLocalDate(System.currentTimeMillis, TimeZone.getTimeZone("PST")).toEpochDay * 86400000
+          val end = start + 86400000
+          if (!order.isOrderAhead || (order.scheduledWindowStart >= start && order.scheduledWindowEnd <= end)) {
+            Logger.debug("Loading into cache")
+            orderManager.orders += (order.getOrderKey -> order)
+          }
+
           val p = OrderAction.make(OrderAction.Type.CREATE, order, -1L, null).from("houston").toGroup("atlas")
           val str = HttpUtils.get(
             config.getString("node.url") + "/api/push",

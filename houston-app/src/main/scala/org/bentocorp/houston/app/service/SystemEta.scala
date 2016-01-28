@@ -98,9 +98,9 @@ class SystemEta {
     var driverCount: Double = driverDao.selectAllOnShift.size
     if (driverCount <= 0) driverCount = 1
 
-    val orderCount: Double = (orders.toMap.map(_._2.getStatus) ++ genericOrders.toMap.map(_._2.getStatus)).foldLeft(0.0) {
-      case (prev, status) =>
-        if (status != Order.Status.COMPLETE && status != Order.Status.CANCELLED) {
+    val orderCount: Double = (orders.toMap.values ++ genericOrders.toMap.values).foldLeft(0.0) {
+      case (prev, o) =>
+        if (o.getStatus != Order.Status.COMPLETE && o.getStatus != Order.Status.CANCELLED && !o.isOrderAhead) {
           prev + 1.0
         } else {
           prev

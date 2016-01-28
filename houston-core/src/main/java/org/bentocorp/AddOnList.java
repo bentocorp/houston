@@ -26,5 +26,19 @@ public class AddOnList extends Bento.BentoObjectWrapper {
             this.name = name;
             this.qty = qty;
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if ( o == null || !(o instanceof AddOn) ) {
+                return false;
+            }
+            AddOn that = (AddOn) o;
+            return (this.id == that.id);
+        }
+
+        @Override
+        public int hashCode() {
+            return (int)(this.id % Integer.MAX_VALUE);
+        }
     }
 }

@@ -20,7 +20,6 @@ import org.bentocorp.dispatch._
 import org.bentocorp.houston.app.service.SystemEta
 import org.bentocorp.houston.config.BentoConfig
 import org.bentocorp.houston.util.{HttpUtils, PhoneUtils}
-import org.bentocorp.mapbox.{MapboxService, WayPoint}
 import org.bentocorp.redis.Redis
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -99,7 +98,9 @@ class HttpController {
               Logger.debug("received access token " + token)
               val drivers = driverManager.drivers.toMap
               drivers.values foreach { d => track(d.id) }
-              SQS.start(HttpController.this)
+              if (!config.getBoolean("ignore-sqs")) {
+                SQS.start(HttpController.this)
+              }
               // TODO - There should be an elegant way to update token for background services
               systemEtaService.start(token)
             }
@@ -387,22 +388,7 @@ class HttpController {
         error(1, e.getMessage)
     }
   }
-
-  @RequestMapping(Array("/test"))
-  def test(@RequestParam("orderId") orderId: String) = {
-    //send(new Push("test_subject", "Hello, World!").from("houston").toGroup("atlas"))
-    // Get driver's current location from Node
-    val order = orderManager.getOrder(orderId)
-    val res = HttpUtils.get(NODE_URL + "/api/gloc", Map("token"->token, "clientId" -> ("d-"+order.getDriverId)))
-    val driverCurrentLoc: APIResponse[WayPoint] = ScalaJson.parse(res, new TypeReference[APIResponse[WayPoint]]() { })
-    val wayPoints: Array[WayPoint] = Array(
-      driverCurrentLoc.ret,
-      new WayPoint(order.address.lng, order.address.lat)
-    )
-    val eta = MapboxService.getEta(wayPoints)
-    eta
-  }
-
+  
   protected def track(driverId: Long): Driver.Status = {
     val str = HttpUtils.get(NODE_URL + "/api/track", Map("clientId" -> ("d-"+driverId), "token" -> token))
     val res: APIResponse[Track] = ScalaJson.parse(str, new TypeReference[APIResponse[Track]] { })
@@ -544,7 +530,7 @@ class HttpController {
   def bentoIsHere(@RequestParam("orderId") orderId: String, @RequestParam("token") token: String) = {
     try {
       val order = orderManager.getOrder(orderId)
-      val str = "Your Bento has arrived. Look for the green flags & meet the server curbside. Thanks and enjoy your meal!"
+      val str = "Your Bento has arrived. Woot! Look for the car with the green flags & please meet your server curbside. Thanks and enjoy your meal!"
       smsSender.send(order.phone, str)
       success("OK")
     } catch {
@@ -639,6 +625,30 @@ class HttpController {
       success("OK")
     } catch {
       case e: Exception => error(1, e.getMessage)
+    }
+  }
+
+  @RequestMapping(Array("/driver/setShiftType"))
+  def changeDriverShift(@RequestParam(value = "rid", defaultValue = "") rid: String,
+                        @RequestParam("driverId")  driverId        : Long,
+                        @RequestParam("shiftType") shiftTypeOrdinal: Int): String = {
+    try {
+      var driver = driverManager.getDriver(driverId)
+      if (driver.shiftType.ordinal() == shiftTypeOrdinal) {
+        throw new Exception("Driver(%s).shiftType is already %s" format (driverId, shiftTypeOrdinal))
+      }
+      val shiftType = Shift.Type.values()(shiftTypeOrdinal)
+      if (driverManager.setShiftType(driverId, shiftType)) {
+        // Retrieve the updated driver from Redis and send a push to Atlas indicating what changed
+        driver = driverManager.getDriver(driverId)
+        val push = new Push("driver_shift", driver).rid(rid).from("houston").toGroup("atlas")
+        send(push)
+        success("OK")
+      } else {
+        throw new Exception("Error - driverManager.setShiftType(%s, %s) = false" format (driverId, shiftType))
+      }
+    } catch {
+      case e: Exception => Logger.error(e.getMessage, e); error(1, e.getMessage)
     }
   }
 }
