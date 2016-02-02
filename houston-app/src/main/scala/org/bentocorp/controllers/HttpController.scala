@@ -195,10 +195,13 @@ class HttpController {
   def send[T](p: Push[T]): APIResponse[String] = {
     val params = Map("rid"  -> p.rid, "from" -> p.from, "to" -> p.to, "subject" -> p.subject,
       "body" -> ScalaJson.stringify(p.body), "token" -> token)
-    val str = HttpUtils.get(
-      config.getString("node.url") + "/api/push", params
+    val (_, res) = HttpUtils.postForm(
+      config.getString("node.url") + "/api/push",  Map("Content-Type"  -> "application/json"), params
     )
-    ScalaJson.parse(str, new TypeReference[APIResponse[String]]() { })
+//    if (code != 200) {
+//      throw new RuntimeException("POST error - HttpController#send() - " + res)
+//    }
+    ScalaJson.parse(res, new TypeReference[APIResponse[String]]() { })
   }
 
   /* Atlas */
@@ -343,9 +346,9 @@ class HttpController {
       Logger.debug("assign(%s, %s, %s, %s)" format (rid, orderId, driverId, afterId))
       val order = orderManager.getOrder(orderId)
       Logger.debug("driverId=" + order.getDriverId)
-      if (driverId != null && driverId > 0 && driverManager.getDriver(driverId).getStatus != Driver.Status.ONLINE) {
-        throw new Exception("Error - driver %s is not online!" format driverId)
-      }
+//      if (driverId != null && driverId > 0 && driverManager.getDriver(driverId).getStatus != Driver.Status.ONLINE) {
+//        throw new Exception("Error - driver %s is not online!" format driverId)
+//      }
       val modifiedOrder: Order[_] =
       //  TODO - driver 0 is valid now (so change to < 0)
       if ((order.getDriverId == null || order.getDriverId <= 0) && driverId != null && driverId > 0) {
@@ -390,7 +393,9 @@ class HttpController {
   }
   
   protected def track(driverId: Long): Driver.Status = {
-    val str = HttpUtils.get(NODE_URL + "/api/track", Map("clientId" -> ("d-"+driverId), "token" -> token))
+    val (_, str) = HttpUtils.postForm(NODE_URL + "/api/track",
+      Map("Content-Type"  -> "application/json"),
+      Map("clientId" -> ("d-"+driverId), "token" -> token))
     val res: APIResponse[Track] = ScalaJson.parse(str, new TypeReference[APIResponse[Track]] { })
     if (res.code != 0) {
       throw new Exception("Error tracking %s - %s" format (driverId, res.msg))

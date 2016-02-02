@@ -78,7 +78,8 @@ object HttpUtils {
     val res = client.execute(new HttpGet(endpoint))
     val statusCode = res.getStatusLine.getStatusCode
     if (statusCode != 200) {
-      val errorMsg = "Error - %s failed with status code %s" format (endpoint, statusCode)
+      val content = IOUtils.toString(res.getEntity.getContent)
+      val errorMsg = "Error - %s failed with status code %s - %s" format (endpoint, statusCode, content)
       if (errorOnFailure) {
         throw new Exception(errorMsg)
       }
@@ -112,9 +113,13 @@ object HttpUtils {
   @throws(classOf[Exception])
   def postForm(url: String, headers: Map[String, Any], body: Map[String, Any]) = {
     val nameValuePairs = new util.ArrayList[NameValuePair](body.size)
+    val buffer = new StringBuffer(url + "?")
     body foreach {
-      case (key, value) => nameValuePairs.add(new BasicNameValuePair(key, value.toString))
+      case (key, value) =>
+        buffer.append(key + "=" + value.toString)
+        nameValuePairs.add(new BasicNameValuePair(key, value.toString))
     }
+    LOGGER.debug(buffer.toString)
     _post(url, headers, new UrlEncodedFormEntity(nameValuePairs, "UTF-8"))
   }
 

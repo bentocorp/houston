@@ -120,10 +120,10 @@ class SystemEta {
       throw new Exception("Error - Problem persisting SSE=%s to MySQL" format res)
     }
     // Because this occurs so frequently, don't log endpoint
-    val str = HttpUtils.get(
-      config.getString("node.url") + "/api/push",
+    val (_, str) = HttpUtils.postForm(
+      config.getString("node.url") + "/api/push",Map("Content-Type"  -> "application/json"),
       Map("from" -> "houston", "to" -> "\"atlas\"", "subject" -> "sse_update",
-        "body" -> res, "token" -> token), logEndPoint = false)
+        "body" -> res, "token" -> token))
   }
 
   def roundToNearestMinutes(d: Double, minute: Int): Int = {

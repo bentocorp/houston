@@ -93,10 +93,10 @@ class SQS(controller: HttpController) extends Thread {
           }
 
           val p = OrderAction.make(OrderAction.Type.CREATE, order, -1L, null).from("houston").toGroup("atlas")
-          val str = HttpUtils.get(
-            config.getString("node.url") + "/api/push",
-            Map("rid" -> p.rid, "from" -> p.from, "to" -> p.to, "subject" -> p.subject,
-            "body" -> ScalaJson.stringify(p.body), "token" -> token))
+          val (_, str) = HttpUtils.postForm(config.getString("node.url") + "/api/push",
+          Map("Content-Type"  -> "application/json"),
+            Map("rid" -> p.rid, "from" -> p.from, "to" -> p.to,
+              "subject" -> p.subject, "body" -> ScalaJson.stringify(p.body), "token" -> token))
           val res: APIResponse[String] = ScalaJson.parse(str, new TypeReference[APIResponse[String]]() { })
           if (res.code != 0) {
             Logger.error("Error sending SQS order to atlas group - " + res.msg)

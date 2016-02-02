@@ -31,7 +31,9 @@ public class BentoBox extends Bento.BentoObjectWrapper {
                         return T;
                     }
                 }
-                throw new Exception(String.format("Temp(%s) not found", value));
+                //throw new Exception(String.format("Temp(%s) not found", value));
+                // TODO - value=null when de-serializing from SQS so default to HOT (for now)
+                return HOT;
             }
 
             @Override
@@ -83,7 +85,7 @@ public class BentoBox extends Bento.BentoObjectWrapper {
                     @JsonProperty("name")  String name,
                     @JsonProperty("type")  String type,
                     @JsonProperty("label") String label,
-                    @JsonProperty("temp") String tempStr) throws Exception {
+                    @JsonProperty("temp")  String tempStr) throws Exception {
             this.id = id;
             this.name = name;
             this.type = Type.parse(type);

@@ -29,8 +29,9 @@
                     </#list>
                     </table>
                 <#else>
-                    <span style="color: green">Status: SUCCESS</span>
-                    <table>
+                    <span style="color: green">Status: SUCCESS</span><br/>
+                    COUNT=${count}
+                    <table cellspacing="0" cellpadding="5px">
                         <tr>
                             <th>Driver</th>
                             <th>Name</th>
@@ -46,20 +47,35 @@
                                 <td style="vertical-align: top">${driverId}</td>
                                 <td style="vertical-align: top">
                                     ${inventories[driverId].name()}</td>
-                                <td style="vertical-align: top">
+                                <td style="vertical-align: top;">
+                                    <table cellspacing="0" style="border: none;">
                                     <#list inventories[driverId].colds() as cold>
-                                        ${cold._1()} x${cold._2()}</br>
+                                        <tr style="border: none;">
+                                            <td style="border: none;">${cold._1()}</td>
+                                            <td style="border: none; vertical-align: top">${cold._2()}</td>
+                                        </tr>
                                     </#list>
+                                    </table>
                                 </td>
                                 <td style="vertical-align: top">
+                                    <table cellspacing="0" style="border: none;">
                                     <#list inventories[driverId].hots() as hot>
-                                        ${hot._1()} x${hot._2()}</br>
+                                        <tr style="border: none;">
+                                            <td style="border: none;">${hot._1()}</td>
+                                            <td style="border: none; vertical-align: top;">${hot._2()}</td>
+                                        </tr>
                                     </#list>
+                                    </table>
                                 </td>
                                 <td style="vertical-align: top">
+                                    <table cellspacing="0" style="border: none;">
                                     <#list inventories[driverId].addons() as addon>
-                                        ${addon._1()} x${addon._2()}</br>
+                                        <tr style="border: none;">
+                                            <td style="border: none;">${addon._1()}</td>
+                                            <td style="border: none; vertical-align: top">${addon._2()}</td>
+                                        </tr>
                                     </#list>
+                                    </table>
                                 </td>
                                 <td style="vertical-align: top">
                                     ${inventories[driverId].start()}

@@ -45,7 +45,8 @@ public enum Shift {
                 return shift;
             }
         }
-        throw new RuntimeException("Shift.parse(" + millis + ", " + zone + ") - No matching enum");
+        String msg = "Shift.parse(" + millis + "=" + T.getHour() + ":" + T.getMinute() + ", " + zone.getID() + ") - No matching enum";
+        throw new RuntimeException(msg);
     }
 
     // This method requires that there be at least one enum

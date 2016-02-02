@@ -3,8 +3,12 @@ package org.bentocorp;
 import com.fasterxml.jackson.annotation.*;
 import org.bentocorp.dispatch.Address;
 import org.bentocorp.houston.util.PhoneUtils;
+import org.bentocorp.houston.util.TimeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.text.SimpleDateFormat;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.locks.Lock;
@@ -13,6 +17,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Order<T> {
+
+    Logger logger = LoggerFactory.getLogger(this.getClass());
 
     public enum Status {
         // protected "value" property required because of how existing order statuses are stored in the database
@@ -103,6 +109,7 @@ public class Order<T> {
             format.setTimeZone(TimeZone.getTimeZone(o.scheduledTimeZone));
             order.scheduledWindowStart = format.parse(o.date + " " + o.scheduledWindowStart).getTime();
             order.scheduledWindowEnd = format.parse(o.date + " " + o.scheduledWindowEnd).getTime();
+            order.scheduledTimeZone = o.scheduledTimeZone;
         }
 
         return order;
@@ -226,15 +233,27 @@ public class Order<T> {
         try {
             if (isOrderAhead) {
                 return Shift.parse(scheduledWindowStart, TimeZone.getTimeZone(scheduledTimeZone)).ordinal();
-            } else if (createdAt != null && createdAt > 0) {
-                // For now (because we're all in California), always parse createdAt assuming PST
-                return Shift.parse(createdAt, TimeZone.getTimeZone("PST")).ordinal();
             }
         } catch (Exception e) {
             // Log something here
-            e.printStackTrace();
+            logger.error(e.getMessage() + " (" + id + ")", e);
         }
         // Not enough information available to determine shift, or error occurred during calculations
         return null;
+    }
+
+    @JsonProperty("date")
+    public String getDate() {
+        try {
+            if (isOrderAhead) {
+                return TimeUtils.getLocalDate(scheduledWindowStart, TimeZone.getTimeZone(scheduledTimeZone)).format(
+                        DateTimeFormatter.ofPattern("MM/dd/yyyy")
+                );
+            }
+        } catch (Exception e) {
+            logger.error(e.getMessage() + " (" + id + ")", e);
+        }
+        return null;
+
     }
 }

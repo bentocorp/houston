@@ -9,7 +9,7 @@ public class Job {
 
   public enum Status {
 
-    PENDING, PROCESSING, FINISHED;
+    PENDING, PROCESSING, FINISHED, ERROR;
 
     public static Status parse(String str) {
       for (Status s: Status.values()) {
@@ -17,7 +17,7 @@ public class Job {
           return s;
         }
       }
-      throw new RuntimeException(str + " cannot be parsed into Job.Status");
+      throw new RuntimeException("\"" + str + "\" cannot be parsed into Job.Status");
     }
 
     @JsonValue

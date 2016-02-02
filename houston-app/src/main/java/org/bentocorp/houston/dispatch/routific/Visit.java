@@ -24,8 +24,7 @@ public class Visit {
         order.address.lat, order.address.lng, order.address.formatForMapbox()
     );
 
-    // XXX -
-    Calendar calendar = Calendar.getInstance(/*TimeZone.getTimeZone(order.scheduledTimeZone)*/);
+    Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone(order.scheduledTimeZone));
 
     calendar.setTimeInMillis(order.scheduledWindowStart);
     this.start = LocalTime.of(calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE));

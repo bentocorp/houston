@@ -204,7 +204,21 @@ class OrderManager {
     val orderType = parts(0)
     val key = parts(1).toLong
     val orderOpt = orderType match {
-      case "o" => orders.get(key)
+      case "o" =>
+        orders.get(key) match {
+          case Some(o) =>
+            Some(o)
+          case _ =>
+            // Load from database if not already in cache
+            val bentos: MMap[Long, Order[Bento]] = _createBentoOrdersFromMySql(orderDao.selectByPrimaryKey(key))
+            if (bentos.isEmpty) {
+              None
+            } else {
+              val first = bentos.values.toList.head
+              orders += key -> first
+              Some(first)
+            }
+        }
       case "g" => genericOrders.get(key)
       case _ => throw new Exception("Error - Unrecognized order type trying to get order " + orderId)
     }
@@ -276,7 +290,6 @@ class OrderManager {
       val parts = orderId.split("-")
       val orderType = parts(0)
       val key = parts(1)
-      /* Comment this out to test locally without affecting the database
       orderType match {
         case "o" =>
           if (!phpService.assign(orderId, driverId, afterId, token)) {
@@ -295,7 +308,6 @@ class OrderManager {
           )
         case _ => throw new Exception("Error - OrderManager#assign - Unrecognized order type for %s" format orderId)
       }
-      */
       // Finally update everything else
       order.setDriverIdWithStatus(driverId, Order.Status.PENDING)
       driver.setOrderQueue(q)

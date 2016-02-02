@@ -66,9 +66,33 @@
         </rollingPolicy>
     </appender>
 
+    <!-- Send logs from OrderAheadController to a separate file -->
+    <appender name="file-order-ahead" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>/sites/houston/current/order-ahead.log</file>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <Pattern>
+                %d{yyyy-MM-dd HH:mm:ss, PST} [%thread] %-5level %logger{36} - %msg%n
+            </Pattern>
+        </encoder>
+
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- rollover daily -->
+            <fileNamePattern>archived/debug.%d{yyyy-MM-dd}.%i.log
+            </fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>10MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+    </appender>
+
     <logger name="org.bentocorp.houston.app.service.SystemEta" level="debug" additivity="false">
         <appender-ref ref="file-sse"/>
         <appender-ref ref="stdout" />
+    </logger>
+
+    <logger name="org.bentocorp.controllers.OrderAheadController" level="debug" additivity="false">
+        <appender-ref ref="file-order-ahead"/>
+        <appender-ref ref="stdout"/>
     </logger>
 
     <!-- Used to debug Socket.IO connectivity under the hood

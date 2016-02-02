@@ -108,7 +108,7 @@ class OrderDao extends Updatable("Order") {
       // and before <param>end</param>
       (r._21 >= start && r._22 <= end) ||
       // Then take all On-Demand orders created on or after @param{start} and before @param{end}
-      (r._2 >= start && r._2 < end) /*||
+      (r._21.isEmpty && r._22.isEmpty && r._2 >= start && r._2 < end) /*||
       // Open orders outstanding
       // XXX - This last clause may be computationally expensive because the tables are not indexed on order status
       (r._16 =!= Order.Status.CANCELLED.toString && r._16 =!= Order.Status.COMPLETE.toString && (r._22 < end || r._2 < end))*/
@@ -122,6 +122,10 @@ class OrderDao extends Updatable("Order") {
       r._21 >= start && r._22 <= end
     }
     res.list
+  }
+
+  def selectByPrimaryKey(pk: Long) = database() withSession { implicit session =>
+    _join filter (_._1 === pk) list
   }
 
   def updateStatus(orderId: Long, orderStatus: Order.Status): Int = database() withSession { implicit session =>

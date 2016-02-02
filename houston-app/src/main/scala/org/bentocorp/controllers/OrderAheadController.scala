@@ -98,19 +98,19 @@ class OrderAheadController {
         }
       // Int -> Driver
       val fleet0 = new util.HashMap[String, Driver]()
-//      var limit = 5 // For trial account
+      var limit = 5 // For trial account
       drivers0 foreach { d =>
-//        if (limit > 0) {
+        if (limit > 0) {
           fleet0.put(d.id + "", new Driver(shift))
-//          limit = limit - 1
-//        }
+          limit = limit - 1
+        }
       }
 
       val input = new Input(visits, fleet0, options)
 
       // Submit the job to Routific for processing
       val (code, res) = HttpUtils.postStr(Routific.LONG_VRP_URL, Map("Authorization" -> Routific.TEST_TOKEN,
-                                                                  "Content-Type"  -> "application/json"), ScalaJson.stringify(input))
+                                                                     "Content-Type"  -> "application/json"), ScalaJson.stringify(input))
       if (code != 202) {
         throw new Exception(code + " - " + res)
       }
@@ -305,6 +305,19 @@ class OrderAheadController {
       if (unserved > 0) {
         throw new Exception(s"The latest job (${job.jobId}) for $dateStr-$shiftValue has $unserved unserved orders")
       }
+
+      // Lastly, make sure today
+      val calendar = Calendar.getInstance(TimeZone.getTimeZone("PST"))
+      val cLocalDate = LocalDate.of(
+        calendar.get(Calendar.YEAR),
+        calendar.get(Calendar.MONTH) + 1, // java.util.Calendar uses 0-based months
+        calendar.get(Calendar.DAY_OF_MONTH)
+      )
+      val cShift = Shift.getShiftEqualToOrGreaterThan(System.currentTimeMillis())
+      if (cLocalDate.format(LOCAL_DATE_FORMAT) != dateStr || cShift.ordinal() != shiftValue) {
+        throw new Exception("Sorry can only assign to this work period")
+      }
+
       // Even if the job is successful, we have to make sure that it is up-to-date. Fetch all Order Ahead orders
       // from the database and see if they are all included in the job.
       val servedOrders = job.output.solution.values.foldLeft(MSet.empty[Long])((a, b) => {
@@ -339,18 +352,6 @@ class OrderAheadController {
         throw new Exception(s"Fleet does not reflect current drivers scheduled for Order Ahead")
       }
 
-      // Lastly, make sure today
-      val calendar = Calendar.getInstance(TimeZone.getTimeZone("PST"))
-      val cLocalDate = LocalDate.of(
-        calendar.get(Calendar.YEAR),
-        calendar.get(Calendar.MONTH) + 1, // java.util.Calendar uses 0-based months
-        calendar.get(Calendar.DAY_OF_MONTH)
-      )
-      val cShift = Shift.getShiftEqualToOrGreaterThan(System.currentTimeMillis())
-      if (cLocalDate.format(LOCAL_DATE_FORMAT) != dateStr || cShift.ordinal() != shiftValue) {
-        throw new Exception("Sorry can only assign to this work period")
-      }
-
       // If we make it here, all is well so we can go ahead and assign (finally!)
       job.output.solution foreach {
         case (driverId, servedVisits) =>
@@ -367,8 +368,10 @@ class OrderAheadController {
 
             val params = Map("rid"  -> p.rid, "from" -> p.from, "to" -> p.to, "subject" -> p.subject,
               "body" -> ScalaJson.stringify(p.body), "token" -> pToken)
-            val str = HttpUtils.get(
-              config.getString("node.url") + "/api/push", params
+            val (_, str) = HttpUtils.postForm(
+              config.getString("node.url") + "/api/push",
+              Map("Content-Type"  -> "application/json"),
+              params
             )
             //ScalaJson.parse(str, new TypeReference[APIResponse[String]]() { })
           }
@@ -409,6 +412,7 @@ class OrderAheadController {
 
         val inventories = new util.HashMap[String, DriverInventory]()
 
+        var count = 0
         job.output.solution foreach {
           case (driverId, visits) =>
             //
@@ -418,7 +422,9 @@ class OrderAheadController {
             val dishes0 = new util.HashMap[BentoBox.Item  , Int]()
             val addons0 = new util.HashMap[AddOnList.AddOn, Int]()
             // For each visit (order)
-            (1 until visits.size) foreach { i => val v = visits(i)
+            (1 until visits.size) foreach { i =>
+              count = count + 1
+              val v = visits(i)
               // Retrieve the order from cache
               val order = orders(v.id.toLong) // Throws Exception if order doesn't exist
               order.item foreach {
@@ -474,7 +480,7 @@ class OrderAheadController {
             val d = inventories.get(driverId)
             d.start = stats._1; d.end = stats._2; d.minutes = stats._3;
         }
-
+        model.put("count", count)
         model.put("inventories", inventories)
       }
     } catch {
