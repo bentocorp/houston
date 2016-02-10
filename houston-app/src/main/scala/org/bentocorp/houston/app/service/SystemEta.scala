@@ -27,6 +27,7 @@ object SystemEta {
   final val ROUND_TO_NEAREST_MINUTE = 5
 }
 
+/* Service which periodically calculates Simple System ETA (SSE) */
 @Component
 class SystemEta {
 

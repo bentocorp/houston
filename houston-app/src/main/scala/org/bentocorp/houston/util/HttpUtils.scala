@@ -13,7 +13,7 @@ import org.apache.http.client.methods.{HttpGet, HttpPost}
 import org.apache.http.entity.StringEntity
 import org.apache.http.impl.client.{CloseableHttpClient, HttpClientBuilder}
 import org.apache.http.message.BasicNameValuePair
-import org.apache.http.{HttpResponse, NameValuePair}
+import org.apache.http.{NoHttpResponseException, HttpResponse, NameValuePair}
 import org.slf4j.LoggerFactory
 import org.springframework.web.context.request.{RequestAttributes, RequestContextHolder}
 
@@ -102,7 +102,21 @@ object HttpUtils {
     }
     // Set body (entity)
     post.setEntity(entity)
-    val res: HttpResponse = client.execute(post)
+    var attempts = 0
+    var done = false
+    var res: HttpResponse = null
+    while (!done) {
+      try {
+        attempts = attempts + 1
+        if (attempts >= 3) {
+          throw new RuntimeException("Reached maximum POST attempts")
+        }
+        res = client.execute(post)
+        done = true
+      } catch {
+        case e: NoHttpResponseException =>
+      }
+    }
     (res.getStatusLine.getStatusCode, IOUtils.toString(res.getEntity.getContent))
   }
 
