@@ -40,7 +40,7 @@ namespace :deploy do
 
   after :finished, :chmod_775 do
     on roles(:all) do |host|
-        execute "sudo chmod -R 775 /sites"
+        execute "sudo chmod -R 775 /sites/houston"
       end
   end
 
