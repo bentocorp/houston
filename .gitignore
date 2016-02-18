@@ -8,4 +8,5 @@ houston-app/houston-app.iml
 houston-core/target/
 houston-core/houston-core.iml
 config/myconfig.rb
-
+.capistrano/
+target/
