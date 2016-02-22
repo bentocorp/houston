@@ -23,7 +23,7 @@ public class Order<T> {
     public enum Status {
         // protected "value" property required because of how existing order statuses are stored in the database
         REJECTED("Rejected"), UNASSIGNED("Open"), PENDING("Assigned"), ACCEPTED("En Route"), MODIFIED("Modified"),
-        COMPLETE("Delivered"), CANCELLED("Cancelled");
+        COMPLETE("Delivered"), CANCELLED("Cancelled"), ARRIVED("Arrived");
 
         String value;
 
