@@ -1,6 +1,6 @@
 package org.bentocorp.db
 
-import java.sql.{Statement, Connection, ResultSet}
+import java.sql.Connection
 import javax.annotation.PostConstruct
 
 import com.mysql.jdbc.jdbc2.optional.MysqlDataSource
@@ -41,7 +41,7 @@ class Database {
   final val Logger = LoggerFactory.getLogger(classOf[Database])
 
   @Autowired
-  val config: BentoConfig = null
+  var config: BentoConfig = null
 
   var database: slick.driver.MySQLDriver.simple.Database = null
 

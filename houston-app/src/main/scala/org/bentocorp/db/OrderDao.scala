@@ -7,11 +7,12 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 
-import slick.driver.MySQLDriver.simple._
-import slick.lifted.{Tag, TableQuery}
+import scala.slick.driver.MySQLDriver.simple._
+import scala.slick.lifted.{TableQuery, Tag}
 
 class TOrder(tag: Tag) extends Table[(Long, Option[Long], Option[Timestamp], Option[String], Option[String],
-  Option[String], Option[String], Option[String], Option[String], Option[String], Option[String])](tag, "Order") {
+  Option[String], Option[String], Option[String], Option[String], Option[String], Option[String], Option[Int],
+  Option[Timestamp], Option[Timestamp], Option[String])](tag, "Order") {
 
   def pk_Order = column[Long]("pk_Order", O.PrimaryKey, O.AutoInc)
   def fk_User = column[Option[Long]]("fk_User")
@@ -24,7 +25,18 @@ class TOrder(tag: Tag) extends Table[(Long, Option[Long], Option[Timestamp], Opt
   def lat = column[Option[String]]("lat")
   def long = column[Option[String]]("long")
   def notes_for_driver = column[Option[String]]("notes_for_driver")
-  def * = (pk_Order, fk_User, created_at, number, street, city, state, zip, lat, long, notes_for_driver)
+  def order_type = column[Option[Int]]("order_type")
+  def scheduled_window_start = column[Option[Timestamp]]("utc_scheduled_window_start")
+  def scheduled_window_end = column[Option[Timestamp]]("utc_scheduled_window_end")
+  def scheduled_timezone = column[Option[String]]("scheduled_timezone")
+  def * = (pk_Order, fk_User, created_at, number, street, city, state, zip, lat, long, notes_for_driver, order_type,
+    scheduled_window_start, scheduled_window_end, scheduled_timezone)
+}
+
+object OrderDao {
+  type CompleteOrderRow = (Long, Option[Timestamp], Option[String], Option[String], Option[String], Option[String], Option[String], /*Some(city), Some(state),*/
+    Option[String], Option[String], Option[String], Option[Long], Option[Long], Option[Long], Option[Long], Option[Long], Option[String],
+    Option[Long], Option[String], Option[String], Option[Int], Option[Timestamp], Option[Timestamp])
 }
 
 @Component
@@ -40,40 +52,80 @@ class OrderDao extends Updatable("Order") {
   val user = TableQuery[TUser]
   val status = TableQuery[TOrderStatus]
 
-  // Select all "active" orders & all "closed" orders after <param>day</param>
-  // TODO note - very inefficient! make sure we come back to address this
-  def select(day: Timestamp) = database() withSession { implicit session =>
-    val res =
-      for {
-        o <- order
-        b <- customerBentoBox
-        u <- user
-        s <- status
-        if o.pk_Order === b.fk_Order && o.fk_User === u.pk_User && o.pk_Order === s.fk_Order &&
-          ((s.status =!= Order.Status.CANCELLED.toString && s.status =!= Order.Status.COMPLETE.toString) || o.created_at >= day)
-      } yield {(
-        o.pk_Order,
-        u.firstname,
-        u.lastname,
-        u.phone,
-        o.number,
-        o.street,
-        o.city,
-        o.state,
-        o.zip,
-        o.lat,
-        o.long,
-        b.fk_main,
-        b.fk_side1,
-        b.fk_side2,
-        b.fk_side3,
-        b.fk_side4,
-        s.status,
-        s.fk_Driver,
-        o.notes_for_driver,
-        s.driver_text_blob
-      )}
+  // Helper function that returns a Query object for joining multiple tables, resulting in rows that completely describe
+  // a Bento order
+  private def _join = {
+    for {
+      o <- order
+      b <- customerBentoBox
+      u <- user
+      s <- status
+      if o.pk_Order === b.fk_Order && o.fk_User === u.pk_User && o.pk_Order === s.fk_Order
+    } yield {(
+      // Eventually, must use Slick's HList to overcome Scala's 22-Tuple limit
+      o.pk_Order,
+      o.created_at, // 2
+      u.firstname,
+      u.lastname,
+      u.phone,
+      o.number.getOrElse("") ++ " " ++ o.street,
+      o.scheduled_timezone,
+//      o.city, // Ignore city for now (always San Francisco) to avoid limit
+//      o.state, // Ignore state for now (always California) to avoid limit
+      o.zip,
+      o.lat,
+      o.long,
+      b.fk_main,
+      b.fk_side1,
+      b.fk_side2,
+      b.fk_side3,
+      b.fk_side4, // TODO - Remove after we release 4-pod Bentos
+      s.status, // 16
+      s.fk_Driver,
+      o.notes_for_driver,
+      s.driver_text_blob,
+      o.order_type,
+      o.scheduled_window_start, // 21
+      o.scheduled_window_end // 22
+    )}
+  }
+
+  // Select all "active" orders & all "closed" orders after <param>start</param>
+  // TODO - Very inefficient because we are still doing a full table scan to retrieve all active orders. Might be better
+  // to ignore all active orders before <param>start</param>
+  def select( start              : Timestamp,
+              // Slick converts None into SQL type NULL
+              // Do not use null otherwise you will get a NullPointerException
+              optionalEnd        : Option[Timestamp] = None) = database() withSession { implicit session =>
+    // Since we now support Order Ahead, we must simultaneously fetch 2 kinds of orders
+    //   a) On-Demand orders
+    // Therefore, internally, we require the end parameter and if is None, we will default it to 24 hours after start
+    val end = optionalEnd getOrElse {
+      new Timestamp(start.getTime + 86400000)
+    }
+    val res = _join filter { r =>
+      // Look at scheduled windows first and take all orders that need to be delivered on or after <param>start</param>
+      // and before <param>end</param>
+      (r._21 >= start && r._22 <= end) ||
+      // Then take all On-Demand orders created on or after @param{start} and before @param{end}
+      (r._21.isEmpty && r._22.isEmpty && r._2 >= start && r._2 < end) /*||
+      // Open orders outstanding
+      // XXX - This last clause may be computationally expensive because the tables are not indexed on order status
+      (r._16 =!= Order.Status.CANCELLED.toString && r._16 =!= Order.Status.COMPLETE.toString && (r._22 < end || r._2 < end))*/
+    }
     res.list
+  }
+
+  def selectByDeliveryWindow(start: Timestamp, end: Timestamp) = database() withSession { implicit session =>
+    // Implies Order-Ahead
+    val res = _join filter { r =>
+      r._21 >= start && r._22 <= end
+    }
+    res.list
+  }
+
+  def selectByPrimaryKey(pk: Long) = database() withSession { implicit session =>
+    _join filter (_._1 === pk) list
   }
 
   def updateStatus(orderId: Long, orderStatus: Order.Status): Int = database() withSession { implicit session =>

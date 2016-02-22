@@ -23,7 +23,8 @@ public class BentoConfig {
     // the Environment instance before injection. Therefore, Houston must be started with the --env option in order to
     // load the correct configurations.
     @Autowired
-    Environment springEnvironment = null;
+    public Environment springEnvironment = null; // This is public so we can manually set it in code for
+                                                 // offline testing
 
     Config config = null;
 
@@ -37,11 +38,16 @@ public class BentoConfig {
         boolean flushRedis = springEnvironment.getProperty("flush-redis") != null;
         boolean noAuth = springEnvironment.getProperty("no-auth") != null;
 
+        // If this option is set (to anything), don't start the SQS service (to avoid
+        // consuming from a live queue)
+        boolean ignoreSqs = springEnvironment.getProperty("ignore-sqs") != null;
+
         String deployId = springEnvironment.getProperty("deploy-id");
 
         config = config.withValue("deploy-id", ConfigValueFactory.fromAnyRef(deployId))
                        .withValue("flush-redis", ConfigValueFactory.fromAnyRef(flushRedis))
                        .withValue("no-auth", ConfigValueFactory.fromAnyRef(noAuth))
+                       .withValue("ignore-sqs", ConfigValueFactory.fromAnyRef(ignoreSqs))
                        .withValue("env", ConfigValueFactory.fromAnyRef(env));
     }
 

@@ -3,6 +3,7 @@ package org.bentocorp.dispatch
 import java.util.{TimeZone, Calendar}
 import javax.annotation.PostConstruct
 
+import org.bentocorp.Shift
 import org.bentocorp.db.DriverDao
 import org.bentocorp.filter.ResyncInterceptor
 import org.bentocorp.houston.util.PhoneUtils
@@ -29,6 +30,8 @@ class DriverManager {
     drivers = redis.getMap[Long, Driver]("drivers")
     // Load data into redis if we are the first thread to reach here
     val resyncTs = ResyncInterceptor.getClosestResyncTimeMillis(System.currentTimeMillis)
+    // This design needs to be revisited. If initialization fails for whatever reason, the
+    // race queue will not be initialized and other servers will be blocked indefinitely.
     redis.race("DriverManager#init_" + resyncTs, () => {
       syncDrivers()
     })
@@ -40,10 +43,12 @@ class DriverManager {
     Logger.info("Fetching drivers from database")
     val drivers = MMap.empty[Long, Driver]
     driverDao.selectAllActive foreach {
-      case (pk, Some(firstname), Some(lastname), Some(phone), statusByte, queueStr) =>
+      case (pk, Some(firstname), Some(lastname), Some(phone), statusByte, queueStr, Some(onShift)) =>
         val normalizedPhone = PhoneUtils.normalize(phone)
+        // TODO - Retire status flag in database by re-tracking with Node following any resync
         val status = if (statusByte > 0) Driver.Status.ONLINE else Driver.Status.OFFLINE
-        val driver = new Driver(pk, firstname + " " + lastname, normalizedPhone, status)
+        val shiftType = Shift.Type.values()(onShift.toInt)
+        val driver = new Driver(pk, firstname + " " + lastname, normalizedPhone, status, shiftType)
         queueStr match {
           case Some(str) =>
             val queue = new java.util.ArrayList[String]()
@@ -105,5 +110,22 @@ class DriverManager {
     } finally {
       redis.unlock(driver.getLockId)
     }
+  }
+
+  def setShiftType(driverId: Long, shiftType: Shift.Type): Boolean = {
+    val driver = getDriver(driverId) // Exception thrown here if driver not found
+    try {
+      redis.lock(driver.getLockId)
+      if (driverDao.updateShiftType(driverId, shiftType) > 0) {
+        driver.shiftType = shiftType
+        // Set to cache
+        drivers += (driver.id -> driver)
+        return true
+      }
+    } finally {
+      // Is this call idempotent?
+      redis.unlock(driver.getLockId)
+    }
+    false
   }
 }

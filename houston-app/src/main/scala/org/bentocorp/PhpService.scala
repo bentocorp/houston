@@ -62,6 +62,7 @@ class PhpService {
   }
 
   def delete(orderId: String, token: String): Boolean = {
+//    return true
     val url = "https://%s/adminapi/order/cancel/%s?api_token=%s" format (phpUrl, orderId, token)
     Logger.debug(url)
     val httpGet = new HttpGet(url)
@@ -83,6 +84,7 @@ class PhpService {
   }
 
   def assign(orderId: String, driverId: Long, afterId: String, token: String): Boolean = {
+//    return true
 //    Logger.debug("PhpService#assign(%s, %s, %s)" format (orderId, driverId, afterId))
     val url = "https://%s/adminapi/order/assign/%s/%s/%s?api_token=%s".format(
       phpUrl,orderId, driverId, afterId, URLEncoder.encode(token, "UTF-8"))

@@ -38,7 +38,13 @@ require 'securerandom'
 
 namespace :deploy do
 
-  after :finished, :cold_start do
+  after :finished, :chmod_775 do
+    on roles(:all) do |host|
+        execute "sudo chmod -R 775 /sites/houston"
+      end
+  end
+
+  after :chmod_775, :cold_start do
     set :deploy_id, SecureRandom.uuid
     run_locally do
       execute "echo '>> Set deploy_id=#{fetch(:deploy_id)}'"

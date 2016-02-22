@@ -17,7 +17,7 @@ end
 desc "Stop Houston"
 task :stop do
 	on roles(:all) do |host|
-		execute "ps -e -o pid,cmd | grep -oP '^\s*[0-9]+(?=\sjava \-jar \-Dserver\.port\=8080)' | sed -e 's/\s\+//g' | sudo xargs kill -9"
+		execute "ps -e -o pid,cmd | grep -oP '^\s*[0-9]+(?=\sjava \-jar \-Dserver\.port\=8080)' | sed -e 's/\s\+//g' | xargs sudo kill -9"
 	end
 end
 

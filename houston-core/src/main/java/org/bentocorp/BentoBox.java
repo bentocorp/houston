@@ -31,7 +31,15 @@ public class BentoBox extends Bento.BentoObjectWrapper {
                         return T;
                     }
                 }
-                throw new Exception(String.format("Temp(%s) not found", value));
+                //throw new Exception(String.format("Temp(%s) not found", value));
+                // TODO - value=null when de-serializing from SQS so default to HOT (for now)
+                return HOT;
+            }
+
+            @Override
+            @JsonValue
+            public String toString() {
+                return value;
             }
         }
 
@@ -70,15 +78,33 @@ public class BentoBox extends Bento.BentoObjectWrapper {
 
         public final String label;
 
+        public final Temp temp;
+
         @JsonCreator
         public Item(@JsonProperty("id")    long   id,
                     @JsonProperty("name")  String name,
                     @JsonProperty("type")  String type,
-                    @JsonProperty("label") String label) throws Exception {
+                    @JsonProperty("label") String label,
+                    @JsonProperty("temp")  String tempStr) throws Exception {
             this.id = id;
             this.name = name;
             this.type = Type.parse(type);
             this.label = label;
+            this.temp = Temp.parse(tempStr);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if ( o == null || !(o instanceof Item) ) {
+                return false;
+            }
+            Item that = (Item) o;
+            return (this.id == that.id);
+        }
+
+        @Override
+        public int hashCode() {
+            return (int)(this.id % Integer.MAX_VALUE);
         }
     }
 

@@ -56,4 +56,19 @@ public class Order {
         public String lastname;
         public String phone;
     }
+
+    @JsonProperty("for_date")
+    public String date;
+
+    @JsonProperty("order_type")
+    public String orderType;
+
+    @JsonProperty("scheduled_window_start")
+    public String scheduledWindowStart;
+
+    @JsonProperty("scheduled_window_end")
+    public String scheduledWindowEnd;
+
+    @JsonProperty("scheduled_timezone")
+    public String scheduledTimeZone;
 }

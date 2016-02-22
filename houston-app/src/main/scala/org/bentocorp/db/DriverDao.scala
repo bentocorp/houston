@@ -2,6 +2,7 @@ package org.bentocorp.db
 
 import java.sql.Timestamp
 
+import org.bentocorp.Shift
 import org.bentocorp.dispatch.Driver
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -40,6 +41,7 @@ class TDriver(tag: Tag) extends Table[TDriver.Row](tag, "Driver") {
   def order_queue = column[Option[String]]("order_queue")
 
   // A flag that is set via the admin dashboard which indicates which drivers are working
+  // MySQL TINYINT (stored as 1 byte)
   def on_shift = column[Option[Byte]]("on_shift")
 
   def * = (pk_Driver, firstname, lastname, mobile_phone, email, status, password, api_token, order_queue, on_shift)
@@ -58,7 +60,7 @@ class DriverDao extends IAuthDao {
   def selectAllActive = db() withSession { implicit session =>
     drivers
       .filter(r => r.deleted_at.isEmpty)
-      .map(r => (r.pk_Driver, r.firstname, r.lastname, r.mobile_phone, r.status, r.order_queue)).list
+      .map(r => (r.pk_Driver, r.firstname, r.lastname, r.mobile_phone, r.status, r.order_queue, r.on_shift)).list
   }
 
   def selectAllOnShift: List[TDriver.Row] = db() withSession { implicit session =>
@@ -89,5 +91,10 @@ class DriverDao extends IAuthDao {
       logger.error("Error - no token rows returned for primary key " + primaryKey)
       None
     }
+  }
+
+  def updateShiftType(driverId: Long, shiftType: Shift.Type) = db() withSession { implicit session =>
+    val row = for { d <- drivers if d.pk_Driver === driverId } yield d.on_shift
+    row.update(Some(shiftType.ordinal().toByte))
   }
 }

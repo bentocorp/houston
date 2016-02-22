@@ -2,8 +2,7 @@ package org.bentocorp.dispatch
 
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
-import java.time.ZoneId
-import java.util.{TimeZone, Calendar}
+import java.util.{Calendar, TimeZone}
 import javax.annotation.PostConstruct
 
 import org.bentocorp._
@@ -12,13 +11,12 @@ import org.bentocorp.filter.ResyncInterceptor
 import org.bentocorp.houston.config.BentoConfig
 import org.bentocorp.houston.util.PhoneUtils
 import org.bentocorp.redis.{RMap, Redis}
-import org.redisson.Redisson
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 
-import scala.collection.mutable.{Map => MMap}
 import scala.collection.JavaConversions._
+import scala.collection.mutable.{Map => MMap}
 
 @Component
 class OrderManager {
@@ -74,8 +72,8 @@ class OrderManager {
     val dishes = MMap.empty[Long, BentoBox.Item]
     Logger.info("Fetching dishes")
     dishDao.selectAll foreach {
-      case (id, Some(name), Some(dishType), Some(label)) =>
-        dishes += id -> new BentoBox.Item(id, name, dishType, label)
+      case (id, Some(name), Some(dishType), Some(label), Some(temp)) =>
+        dishes += id -> new BentoBox.Item(id, name, dishType, label, temp)
       case row =>
         throw new Exception("Bad dish row - Expected (id, Some(name), Some(dishType), Some(label)) but got " + row)
     }
@@ -92,40 +90,16 @@ class OrderManager {
     // Note that the returned time (in milliseconds) corresponds to UTC - or time zone 0 - which is what is configured
     // in the databases
     val startOfToday = new Timestamp(calendar.getTimeInMillis)
-    val orders = MMap.empty[Long, Order[Bento]]
-    Logger.info("Fetching orders created on or after %s (%s)" format (DATE_FORMATTER.format(startOfToday), startOfToday.getTime))
-    orderDao.select(startOfToday) foreach {
-      case (orderId, Some(firstname), Some(lastname), Some(phone), numberOpt, Some(street), Some(city), Some(state), zipCodeOpt, Some(lat), Some(lng), mainOpt, side1Opt, side2Opt, side3Opt, side4Opt, Some(statusStr), driverIdOpt, notesOpt, Some(driverTextBlob)) =>
-        val status = Order.Status.parse(statusStr)
-        if (status == Order.Status.CANCELLED) {
-          Logger.debug("Ignoring %s order %s" format (status, orderId))
-        } else {
-          val order = {
-            orders.get(orderId) match {
-              case Some(existingOrder) => existingOrder
-              case _ =>
-                // TODO - Create country enums?
-                val address = new Address(numberOpt.getOrElse("") + " " + street, null, city, state, zipCodeOpt.getOrElse(""), "United States")
-                address.lat = lat.toFloat
-                address.lng = lng.toFloat
-                val newOrder = new Order[Bento]("o-" + orderId, firstname, lastname, PhoneUtils.normalize(phone), address, new Bento)
-                val driverId = if (driverIdOpt.isDefined && driverIdOpt.get > 0) new java.lang.Long(driverIdOpt.get) else null
-                newOrder.setDriverIdWithStatus(driverId, status)
-                newOrder.notes = notesOpt.getOrElse("")
-                newOrder.orderString = driverTextBlob
-                orders += orderId -> newOrder
-                newOrder
-            }
-          }
-          val bentoBoxItemIds: Array[Long] = Array(mainOpt, side1Opt, side2Opt, side3Opt, side4Opt).filter(_.isDefined).map(_.get)
-          val bentoBox = new BentoBox
-          bentoBoxItemIds foreach { id => bentoBox.add(dishes(id)) }
-          // The order item here is a Bento (which is an Array of BentoBox)
-          order.item.add(bentoBox)
-        }
-      case row =>
-        throw new Exception("Bad order row - " + row)
-    }
+
+    calendar.add(Calendar.DATE, 1)
+    val endOfToday = new Timestamp(calendar.getTimeInMillis)
+
+    Logger.info("Fetching orders created on or after %s (%s) and before %s (%s)" format (
+      DATE_FORMATTER.format(startOfToday), startOfToday.getTime, DATE_FORMATTER.format(endOfToday), endOfToday.getTime
+    ))
+
+    // This will fetch all Order Ahead orders for today as well
+    val orders = _createBentoOrdersFromMySql(orderDao.select(startOfToday, Some(endOfToday)))
     Logger.info("Processed %s Bento order(s)" format orders.size)
 
     /* generic orders */
@@ -164,6 +138,64 @@ class OrderManager {
     redis.setMap("genericOrders", genericOrders)
   }
 
+  private def _createBentoOrdersFromMySql(rows: List[OrderDao.CompleteOrderRow]): MMap[Long, Order[Bento]] = {
+    // Build a map (as opposed to a list) of Bento orders because
+    //   a) We can quickly look up existing orders as the Bentos are being built
+    //   b) So that we can persist the data in Redis to be shared globally by multiple Houston instances
+    val orders = MMap[Long, Order[Bento]]()
+    rows foreach {
+      case (orderId, Some(createdAt), Some(firstname), Some(lastname), Some(phone), Some(street), scheduledTimeZoneOpt, /*Some(city), Some(state),*/
+      zipCodeOpt, Some(lat), Some(lng), mainOpt, side1Opt, side2Opt, side3Opt, side4Opt, Some(statusStr),
+      driverIdOpt, notesOpt, Some(driverTextBlob), Some(orderType), scheduledWindowStartOpt, scheduledWindowEndOpt) =>
+        val status = Order.Status.parse(statusStr)
+        if (status == Order.Status.CANCELLED) {
+          Logger.debug("Ignoring %s order %s" format (status, orderId))
+        } else {
+          val order = {
+            orders.get(orderId) match {
+              case Some(existingOrder) => existingOrder
+              case _ =>
+                // TODO - Create country enums?
+                val address = new Address(street.trim(), null, "San Francisco", "California", zipCodeOpt.getOrElse(""), "United States")
+                address.lat = lat.toFloat
+                address.lng = lng.toFloat
+                val newOrder = new Order[Bento]("o-" + orderId, firstname, lastname, PhoneUtils.normalize(phone), address, new Bento)
+                val driverId = if (driverIdOpt.isDefined && driverIdOpt.get > 0) new java.lang.Long(driverIdOpt.get) else null
+                newOrder.setDriverIdWithStatus(driverId, status)
+                newOrder.notes = notesOpt.getOrElse("")
+                newOrder.orderString = driverTextBlob
+                newOrder.createdAt = createdAt.getTime
+                // Order-Ahead stuff
+                if (orderType == 2) {
+                  newOrder.isOrderAhead = true
+                  // For now, make scheduledWindowStart and scheduledWindowEnd mandatory if Order-Ahead (Routific does not require scheduledWindowEnd)
+                  if (scheduledWindowStartOpt.isEmpty || scheduledWindowEndOpt.isEmpty) {
+                    throw new Exception(s"$orderId is Order-Ahead but has either no delivery start window or delivery end window")
+                  }
+                  newOrder.scheduledWindowStart = scheduledWindowStartOpt.get.getTime
+                  newOrder.scheduledWindowEnd = scheduledWindowEndOpt.get.getTime
+                  newOrder.scheduledTimeZone = scheduledTimeZoneOpt.get
+                }
+                orders += orderId -> newOrder
+                newOrder
+            }
+          }
+          val bentoBoxItemIds: Array[Long] = Array(mainOpt, side1Opt, side2Opt, side3Opt, side4Opt).filter(_.isDefined).map(_.get)
+          val bentoBox = new BentoBox
+          bentoBoxItemIds foreach { id => bentoBox.add(dishes(id)) }
+          // The order item here is a Bento (which is an Array of BentoBox)
+          order.item.add(bentoBox)
+        }
+      case row =>
+        throw new Exception("Bad order row - " + row)
+    }
+    orders
+  }
+
+  def createOrderAheadOrders(scheduledWindowStart: Timestamp, scheduledWindowEnd: Timestamp): MMap[Long, Order[Bento]] = {
+    _createBentoOrdersFromMySql(orderDao.selectByDeliveryWindow(scheduledWindowStart, scheduledWindowEnd))
+  }
+
   def getOrder(orderId: String): Order[_] = {
     val parts: Array[String] = orderId.split("-") // b-1234, g-5678
     if (parts.length < 2) {
@@ -172,7 +204,21 @@ class OrderManager {
     val orderType = parts(0)
     val key = parts(1).toLong
     val orderOpt = orderType match {
-      case "o" => orders.get(key)
+      case "o" =>
+        orders.get(key) match {
+          case Some(o) =>
+            Some(o)
+          case _ =>
+            // Load from database if not already in cache
+            val bentos: MMap[Long, Order[Bento]] = _createBentoOrdersFromMySql(orderDao.selectByPrimaryKey(key))
+            if (bentos.isEmpty) {
+              None
+            } else {
+              val first = bentos.values.toList.head
+              orders += key -> first
+              Some(first)
+            }
+        }
       case "g" => genericOrders.get(key)
       case _ => throw new Exception("Error - Unrecognized order type trying to get order " + orderId)
     }
@@ -219,6 +265,9 @@ class OrderManager {
     // First make sure the order and the driver exist
     val order = getOrder(orderId)
     val driver = driverManager.getDriver(driverId)
+    if ("-1".equals(afterId)) {
+      throw new Exception("Setting afterId to -1 has been deprecated. Use null instead")
+    }
     try {
       // To mitigate deadlocks, obtain resources in a natural order - order first, then driver
       redis.lock(order.getLockId); redis.lock(driver.getLockId)

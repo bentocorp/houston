@@ -92,7 +92,7 @@ class RMap[K: Manifest, V: Manifest](redisClient: RedisClient, name: String) {
       None
     } else {
       val obj = {
-        val `type` = getJavaType(manifest[V])
+        val `type` = ScalaJson.getJavaType(manifest[V])
 //        println(str)
 //        println(`type`)
         ScalaJson.parse(str, `type`).asInstanceOf[V]
@@ -101,20 +101,12 @@ class RMap[K: Manifest, V: Manifest](redisClient: RedisClient, name: String) {
     }
   }
 
-  def getJavaType(manifest: Manifest[_]): JavaType = {
-    if (manifest.typeArguments.isEmpty) {
-      return ScalaJson.TypeFactory.constructType(manifest.runtimeClass)
-    }
-    val typeArguments: Seq[JavaType] = manifest.typeArguments.map(getJavaType).toSeq
-    ScalaJson.TypeFactory.constructParametrizedType(manifest.runtimeClass, manifest.runtimeClass, typeArguments: _*)
-  }
-
   def apply(key: K): V = {
     val redisConnection = redisClient.connect()
     var res0: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SELECT, new JInt(Redis.DB))
-    val str = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.GET, redisKeyMapEntry(key+""))
+    res0 = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.GET, redisKeyMapEntry(key+""))
     redisConnection.closeAsync()
-    ScalaJson.parse(str, new TypeReference[V]() { })
+    ScalaJson.parse(res0, manifest[V])
   }
 
   def contains(key: K): Boolean = {
