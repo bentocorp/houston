@@ -98,7 +98,7 @@ class OrderAheadController {
         }
       // Int -> Driver
       val fleet0 = new util.HashMap[String, Driver]()
-      var limit = 5 // For trial account
+      var limit = 2
       drivers0 foreach { d =>
         if (limit > 0) {
           fleet0.put(d.id + "", new Driver(shift))
