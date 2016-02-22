@@ -109,7 +109,7 @@ class OrderAheadController {
       val input = new Input(visits, fleet0, options)
 
       // Submit the job to Routific for processing
-      val (code, res) = HttpUtils.postStr(Routific.LONG_VRP_URL, Map("Authorization" -> Routific.TEST_TOKEN,
+      val (code, res) = HttpUtils.postStr(Routific.LONG_VRP_URL, Map("Authorization" -> token,
                                                                      "Content-Type"  -> "application/json"), ScalaJson.stringify(input))
       if (code != 202) {
         throw new Exception(code + " - " + res)
