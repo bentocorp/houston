@@ -104,9 +104,17 @@ class OrderManager {
 
     /* generic orders */
 
-    val genericOrders = MMap.empty[Long, Order[String]]
     Logger.info("Fetching generic orders created on or after %s (%s)" format (DATE_FORMATTER.format(startOfToday), startOfToday.getTime))
-    genericOrderDao.select(startOfToday) foreach {
+    val genericOrders: MMap[Long, Order[String]] = _createGenericOrdersFromMySql(genericOrderDao.select(startOfToday))
+    Logger.info("Processed %s generic order(s)" format genericOrders.size)
+    // Transactionally set dishes, order, and genericOrders to distributed cache
+    redis.setMap("orders", orders)
+    redis.setMap("genericOrders", genericOrders)
+  }
+
+  private def _createGenericOrdersFromMySql(rows: List[GenericOrderDao.CompleteGenericOrderRow]): MMap[Long, Order[String]] = {
+    val genericOrders = MMap.empty[Long, Order[String]]
+    rows foreach {
       // Note: Since "name" was split into "firstname" and "lastname", lastname may be null and that case must be
       // accounted for
       case (Some(orderId), statusStr, driverIdOpt, Some(firstname), lastnameOpt, Some(phone), Some(street), Some(city), Some(state), Some(zipCode), Some(country), lat, lng, Some(body), notesOpt) =>
@@ -132,10 +140,7 @@ class OrderManager {
       case row =>
         throw new Exception("Bad generic order row - " + row)
     }
-    Logger.info("Processed %s generic order(s)" format genericOrders.size)
-    // Transactionally set dishes, order, and genericOrders to distributed cache
-    redis.setMap("orders", orders)
-    redis.setMap("genericOrders", genericOrders)
+    genericOrders
   }
 
   private def _createBentoOrdersFromMySql(rows: List[OrderDao.CompleteOrderRow]): MMap[Long, Order[Bento]] = {
@@ -219,7 +224,21 @@ class OrderManager {
               Some(first)
             }
         }
-      case "g" => genericOrders.get(key)
+      case "g" =>
+        genericOrders.get(key) match {
+          case Some(o) =>
+            Some(o)
+          case _ =>
+            // Load from database if not already in cache
+            val bentos: MMap[Long, Order[String]] = _createGenericOrdersFromMySql(genericOrderDao.selectByPrimaryKey(key))
+            if (bentos.isEmpty) {
+              None
+            } else {
+              val first = bentos.values.toList.head
+              genericOrders += key -> first
+              Some(first)
+            }
+        }
       case _ => throw new Exception("Error - Unrecognized order type trying to get order " + orderId)
     }
     if (orderOpt.isEmpty) {

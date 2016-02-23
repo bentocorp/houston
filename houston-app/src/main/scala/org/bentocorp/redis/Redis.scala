@@ -72,7 +72,6 @@ class Redis {
 
   def race(key: String, celebrate: () => Unit) {
     val redisConnection = connect(9)
-    val res0: String = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.SELECT, new JInt(Redis.DB))
     var place: Long = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.INCR, key)
     if (place == 1) {
       // This thread is first in the race
@@ -81,13 +80,13 @@ class Redis {
     } else {
       // Otherwise, block indefinitely (timeout=0) until the winner finishes celebrating
       Logger.info("Blocked at position %s in race %s" format (place, key))
-      redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.BLPOP, redisKeyRaceQueue(key), new java.lang.Integer(0))
+      val res1: Object = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.BLPOP, redisKeyRaceQueue(key), new java.lang.Integer(0))
     }
     //place = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.DECR, key)
     //if (place > 0) {
       Logger.info("Finished - passing baton for race " + key)
       // Unblock the next thread waiting in line
-      redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.RPUSH, redisKeyRaceQueue(key), "OK")
+      val res2: java.lang.Long = redisConnection.sync(StringCodec.INSTANCE, RedissonRedisCommands.RPUSH, redisKeyRaceQueue(key), "OK")
     //} else {
       // Delete keys to prevent memory leaks?
     //}

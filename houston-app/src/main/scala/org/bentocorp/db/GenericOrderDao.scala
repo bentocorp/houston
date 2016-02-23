@@ -3,6 +3,7 @@ package org.bentocorp.db
 import java.sql.{Connection, Timestamp}
 
 import org.bentocorp.Order
+import org.bentocorp.db.GenericOrderDao.CompleteGenericOrderRow
 import org.bentocorp.dispatch.Address
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -37,6 +38,14 @@ class TGenericOrder(tag: Tag) extends Table[(Option[Long], Timestamp, Option[Tim
     city, region, zip_code, country, lat, lng, body, notes_for_driver)
 }
 
+object GenericOrderDao {
+  type CompleteGenericOrderRow = (
+    Option[Long], String, Option[Long],
+    Option[String], Option[String], Option[String], Option[String], Option[String], Option[String],
+    Option[String], Option[String], Option[String], Option[String], Option[String], Option[String]
+  )
+}
+
 @Component
 class GenericOrderDao extends Updatable("generic_Order") {
 
@@ -52,6 +61,26 @@ class GenericOrderDao extends Updatable("generic_Order") {
   def select(day: Timestamp) = database() withSession { implicit session =>
     genericOrders.filter(r => (r.status =!= Order.Status.CANCELLED.toString && r.status =!= Order.Status.COMPLETE.toString) ||
       r.created_at >= day).map(r => (
+      r.pk_generic_Order,
+      r.status,
+      r.fk_Driver,
+      r.firstname,
+      r.lastname,
+      r.phone,
+      r.street,
+      r.city,
+      r.region,
+      r.zip_code,
+      r.country,
+      r.lat,
+      r.lng,
+      r.body,
+      r.notes_for_driver
+    )).list
+  }
+
+  def selectByPrimaryKey(pk: Long): List[CompleteGenericOrderRow] = database() withSession { implicit session =>
+    genericOrders.filter(_.pk_generic_Order === pk).map(r => (
       r.pk_generic_Order,
       r.status,
       r.fk_Driver,

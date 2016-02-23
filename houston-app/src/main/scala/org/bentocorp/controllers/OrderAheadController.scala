@@ -374,6 +374,16 @@ class OrderAheadController {
               params
             )
             //ScalaJson.parse(str, new TypeReference[APIResponse[String]]() { })
+
+            // Send push notification to driver
+            val p2 = OrderAction.make(OrderAction.Type.ASSIGN, modifiedOrder, driverId.toLong, null).from("houston").toRecipient("d-" + driverId)
+            val params2 = Map("rid"  -> p2.rid, "from" -> p2.from, "to" -> p2.to, "subject" -> p2.subject,
+              "body" -> ScalaJson.stringify(p2.body), "token" -> pToken)
+            val (_, str2) = HttpUtils.postForm(
+              config.getString("node.url") + "/api/push",
+              Map("Content-Type"  -> "application/json"),
+              params2
+            )
           }
       }
       success(0, "OK")

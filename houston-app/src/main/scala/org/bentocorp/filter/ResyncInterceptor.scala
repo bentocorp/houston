@@ -46,8 +46,15 @@ class ResyncInterceptor extends HandlerInterceptorAdapter {
 
   final val logger = LoggerFactory.getLogger(classOf[ResyncInterceptor])
 
+  // Very important - This field must be initialized because DriverManager and OrderManager will have already
+  // performed the initial resync at instantiation. If set to 0, ResyncInterceptor will trigger an additional (and
+  // unnecessary) resync which will have the following effect
+  //    + The cache will be flushed, but
+  //    + The key for the current @code{resyncTs} will be greater than 1 (because this will have already been
+  //      incremented past 1 by DriverManager and OrderManager when those classes were instantiated)
+  //    + Therefore, the drivers and orders will not be reloaded
   @volatile
-  var lastResyncTs: Long = 0l
+  var lastResyncTs: Long = ResyncInterceptor.getClosestResyncTimeMillis(System.currentTimeMillis)
 
   @Autowired
   var redis: Redis = _
@@ -73,6 +80,7 @@ class ResyncInterceptor extends HandlerInterceptorAdapter {
     this.synchronized {
       if (lastResyncTs != resyncTs) {
         lastResyncTs = resyncTs // TODO - What to do with existing
+        logger.debug("Flushing database 8")
         redis.flushdb(List(8))
         logger.debug("Resyncing orders")
         redis.race("OrderManager#init_" + resyncTs, () => { orderManager.syncOrders() })
