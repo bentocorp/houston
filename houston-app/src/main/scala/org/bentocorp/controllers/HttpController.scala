@@ -536,6 +536,7 @@ class HttpController {
     try {
       val order = orderManager.getOrder(orderId)
       orderManager.updateStatus(order.id, Order.Status.ARRIVED)
+      send(OrderStatus.make(orderId, Order.Status.ARRIVED).from("houston").toGroup("atlas"))
       val str = "Your Bento has arrived. Woot! Look for the car with the green flags & please meet your server curbside. Thanks and enjoy your meal!"
       smsSender.send(order.phone, str)
       success("OK")
