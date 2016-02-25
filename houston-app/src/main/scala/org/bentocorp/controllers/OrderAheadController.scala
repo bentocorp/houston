@@ -74,7 +74,8 @@ class OrderAheadController {
     try {
       // Order#id -> Visit
       val visits = new util.HashMap[String, Visit]()
-      _getOrderAheadOrders(dateStr, shiftValue) foreach {
+      // We only want to route unassigned orders!
+      _getOrderAheadOrders(dateStr, shiftValue).filter(_._2.getStatus == Order.Status.UNASSIGNED) foreach {
         case (_, o) =>
           // Use order key instead of id because Routific does not allow hyphenated keys
           visits.put(o.getOrderKey.toString, new Visit(o))
@@ -290,7 +291,6 @@ class OrderAheadController {
   @ResponseBody
   def assign(@RequestParam(value = "date")  dateStr   : String,
              @RequestParam(value = "shift") shiftValue: Int): String = {
-    var redisConnection: RedisConnection = null
     try {
       // First we have to check to see if there's any routing data available for the user-supplied
       // work period (date & shift)
@@ -333,7 +333,8 @@ class OrderAheadController {
         a
       })
       println(s"SERVED=[${servedOrders.mkString(",")}")
-      val orderIds: List[Long] = _getOrderAheadOrders(dateStr, shiftValue).keys.toList
+      // _getOrderAheadOrders() retrieves all orders so we must filter out the ones that have already been assigned
+      val orderIds: List[Long] = _getOrderAheadOrders(dateStr, shiftValue).filter(_._2.getStatus == Order.Status.UNASSIGNED).keys.toList
       if (servedOrders.size != orderIds.size) {
         throw new Exception(s"The latest job (${job.jobId}) size is wrong. Please try routing again.")
       }
@@ -352,6 +353,7 @@ class OrderAheadController {
         throw new Exception(s"Fleet does not reflect current drivers scheduled for Order Ahead")
       }
 
+      logger.debug(">>>>>\n" + ScalaJson.stringify(job))
       // If we make it here, all is well so we can go ahead and assign (finally!)
       job.output.solution foreach {
         case (driverId, servedVisits) =>
@@ -362,6 +364,7 @@ class OrderAheadController {
             //println("PHP_TOKEN=" + pToken)
             println("o-" + v.id + "," + driverId.toLong + "," + "-1" + "," + pToken)
 
+            logger.debug(s"ASSIGN ${driverId}, o-${v.id}")
             val modifiedOrder = orderManager.assign("o-" + v.id, driverId.toLong, null, pToken)
 
             val p = OrderAction.make(OrderAction.Type.ASSIGN, modifiedOrder, driverId.toLong, null).from("houston").toGroup("atlas")
@@ -394,7 +397,6 @@ class OrderAheadController {
         // Forward the error to the front-end (Atlas)
         error(1, e.getMessage)
     } finally {
-      if (redisConnection != null) redisConnection.closeAsync()
     }
   }
 
