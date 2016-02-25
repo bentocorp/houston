@@ -8,7 +8,7 @@ import org.bentocorp.Order
 import org.bentocorp.api.APIResponse._
 import org.bentocorp.db.{Database, TOrder, TOrderStatus}
 import org.bentocorp.houston.config.BentoConfig
-import org.bentocorp.houston.util.TimeUtils
+import org.bentocorp.houston.util.{EmailUtils, TimeUtils}
 import org.bentocorp.redis.{Redis, RedisCommands}
 import org.redisson.client.RedisConnection
 import org.redisson.client.codec.StringCodec
@@ -145,4 +145,30 @@ class AdminController {
       if (redisConnection != null) redisConnection.closeAsync()
     }
   }
+
+    @RequestMapping(Array("/reportAtlasException"))
+    def reportAtlasException(@RequestParam("html") html: String) = {
+        try {
+            // TODO - Move logic to EmailUtils because it is also being used in GlobalControllerExceptionHandler
+            var from = "engalert"
+            val env: String = config.getString("env")
+            if ("prod" == env) {
+                from += "@bentonow.com"
+            } else {
+                from += s"-${env}@bentonow.com"
+            }
+            EmailUtils.send("api",
+                            config.getString("mailgun.key"),
+                            from,
+                            "email@bento.pagerduty.com",
+                            "EXCEPTION: Atlas",
+                            html)
+            success("OK")
+        } catch {
+            case exc: Exception =>
+                exc.printStackTrace()
+                error(1, exc.getMessage)
+        }
+    }
+
 }
