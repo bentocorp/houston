@@ -629,6 +629,9 @@ class HttpController {
   def syncDrivers() = {
     try {
       driverManager.syncDrivers()
+      // Track drivers again in case new ones got added
+      // TODO - Untrack old drivers
+      driverManager.drivers.toMap.values foreach { d => track(d.id) }
       success("OK")
     } catch {
       case e: Exception => error(1, e.getMessage)
