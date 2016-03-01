@@ -13,10 +13,12 @@ public class AddOnList extends Bento.BentoObjectWrapper {
     public List<AddOn> items = new ArrayList<AddOn>();
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class AddOn {
+    public static class AddOn
+    {
         public final long id;
         public final String name;
         public final int qty;
+        public Long pk_OrderItem;
 
         @JsonCreator
         public AddOn(@JsonProperty("id")   long   id,
@@ -40,5 +42,29 @@ public class AddOnList extends Bento.BentoObjectWrapper {
         public int hashCode() {
             return (int)(this.id % Integer.MAX_VALUE);
         }
+
+        public void setPkOrderItem(Long pk)
+        {
+            this.pk_OrderItem = pk;
+        }
     }
+
+    public void add(AddOn item)
+    {
+        items.add(item);
+    }
+
+
+    public String printPkOrderItem()
+    {
+        if (items.size() > 0) {
+            StringBuffer buffer = new StringBuffer(items.get(0).pk_OrderItem + "");
+            for (int i = 1; i < items.size(); i++) {
+                buffer.append("," + items.get(i).pk_OrderItem);
+            }
+            return buffer.toString();
+        }
+        return "empty";
+    }
+
 }

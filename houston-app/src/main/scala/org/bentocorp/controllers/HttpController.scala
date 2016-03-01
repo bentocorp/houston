@@ -264,6 +264,13 @@ class HttpController {
 
   }
 
+  /*
+  @RequestMapping(Array("/test1"))
+  def test1 : String = {
+
+  }
+  */
+
   @RequestMapping(Array("/order/update"))
   def updateOrder(@RequestParam(value = "rid", defaultValue = "") rid: String,
                   @RequestParam(value = "orderId") orderId: String,
@@ -413,7 +420,8 @@ class HttpController {
 
   /* Driver app */
 
-  @RequestMapping(Array("/order/getAllAssigned"))
+  //@RequestMapping(Array("/order/getAllAssigned"))
+  @RequestMapping(value = Array("/order/getAllAssigned"), produces = Array("application/json; charset=UTF-8"))
   def orderGetAllAssigned(@RequestParam(value = "token") token: String): String = {
     // To be moved to Spring's authentication filters
     val driverId = token.split("-")(1).toLong
