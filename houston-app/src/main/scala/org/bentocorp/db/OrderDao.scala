@@ -121,6 +121,7 @@ class OrderDao extends Updatable("Order") {
     val res = _join filter { r =>
       r._21 >= start && r._22 <= end
     }
+    println(res.selectStatement)
     res.list
   }
 

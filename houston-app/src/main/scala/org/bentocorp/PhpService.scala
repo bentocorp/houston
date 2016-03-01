@@ -86,8 +86,11 @@ class PhpService {
   def assign(orderId: String, driverId: Long, afterId: String, token: String): Boolean = {
 //    return true
 //    Logger.debug("PhpService#assign(%s, %s, %s)" format (orderId, driverId, afterId))
+    // Normalize
+    val normalizedAfterId = if (afterId == null) "-1" else afterId;
+
     val url = "https://%s/adminapi/order/assign/%s/%s/%s?api_token=%s".format(
-      phpUrl,orderId, driverId, afterId, URLEncoder.encode(token, "UTF-8"))
+      phpUrl,orderId, driverId, normalizedAfterId, URLEncoder.encode(token, "UTF-8"))
     Logger.debug(url)
     val request = new HttpGet(url)
     val config = RequestConfig.custom()

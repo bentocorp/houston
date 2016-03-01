@@ -198,7 +198,10 @@ class OrderManager {
   }
 
   def createOrderAheadOrders(scheduledWindowStart: Timestamp, scheduledWindowEnd: Timestamp): MMap[Long, Order[Bento]] = {
-    _createBentoOrdersFromMySql(orderDao.selectByDeliveryWindow(scheduledWindowStart, scheduledWindowEnd))
+    val orders = _createBentoOrdersFromMySql(orderDao.selectByDeliveryWindow(scheduledWindowStart, scheduledWindowEnd));
+    println(ScalaJson.stringify(orders));
+
+    return orders;
   }
 
   def getOrder(orderId: String): Order[_] = {
@@ -284,9 +287,9 @@ class OrderManager {
     // First make sure the order and the driver exist
     val order = getOrder(orderId)
     val driver = driverManager.getDriver(driverId)
-    if ("-1".equals(afterId)) {
+/*    if ("-1".equals(afterId)) {
       throw new Exception("Setting afterId to -1 has been deprecated. Use null instead")
-    }
+    }*/
     try {
       // To mitigate deadlocks, obtain resources in a natural order - order first, then driver
       redis.lock(order.getLockId); redis.lock(driver.getLockId)
@@ -296,7 +299,7 @@ class OrderManager {
         throw new Exception("Error - Order %s is currently assigned to driver %s" format (orderId, cd))
       }
       val q = driver.getOrderQueue
-      if (afterId == null || afterId.isEmpty) {
+      if (afterId == null || afterId.isEmpty || afterId.toLong <= 0) {
         q.add(orderId)
       } else {
         val pos = q.indexOf(afterId)
@@ -312,7 +315,7 @@ class OrderManager {
       orderType match {
         case "o" =>
           if (!phpService.assign(orderId, driverId, afterId, token)) {
-            throw new Exception("PHP order unassignment failed")
+            throw new Exception("PHP order assignment failed")
           }
           /*
           orderDao.assignOrderTransaction(
