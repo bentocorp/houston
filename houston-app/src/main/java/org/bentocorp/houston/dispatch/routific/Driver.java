@@ -27,7 +27,7 @@ public class Driver {
 
   // Routific returns speed as a number
   // Default to normal speed
-  public float speed = Speed.FAST.value;
+  public float speed = Speed.FASTER.value;
 
   public Driver() {
     // Empty constructor to allow Jackson to deserialize
