@@ -33,7 +33,7 @@ public class Visit {
     this.end = LocalTime.of(calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE));
 
     // Set default duration (of delivery) to 10 minutes
-    this.durationInMinutes = 10;
+    this.durationInMinutes = 8;
   }
 
   /* The following fields are required for routing
