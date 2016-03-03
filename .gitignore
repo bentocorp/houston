@@ -10,4 +10,4 @@ houston-core/houston-core.iml
 config/myconfig.rb
 .capistrano/
 target/
-
+/nohup.out
