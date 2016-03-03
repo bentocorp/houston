@@ -20,7 +20,8 @@ public class Order<T> {
 
     Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    public enum Status {
+    public enum Status
+    {
         // protected "value" property required because of how existing order statuses are stored in the database
         REJECTED("Rejected"), UNASSIGNED("Open"), PENDING("Assigned"), ACCEPTED("En Route"), MODIFIED("Modified"),
         COMPLETE("Delivered"), CANCELLED("Cancelled"), ARRIVED("Arrived");
@@ -32,6 +33,7 @@ public class Order<T> {
         }
 
         @Override
+        //@JsonValue
         public String toString() {
             return value;
         }
