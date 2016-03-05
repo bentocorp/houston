@@ -395,7 +395,7 @@ class HttpController {
       val res = send(OrderAction.make(OrderAction.Type.ASSIGN, modifiedOrder, driverId, afterId).rid(rid).from("houston").toGroup("atlas"))
 
       // Send to consumer app
-      val res2 = send(OrderAction.make(OrderAction.Type.ASSIGN, modifiedOrder, driverId, afterId).from("houston").toRecipient("c-" + order.pk_User)
+      val res2 = send(OrderAction.make(OrderAction.Type.ASSIGN, modifiedOrder, driverId, afterId).from("houston").toRecipient("c-" + order.pk_User))
 
       if (res.code != 0) {
         Logger.debug("Warning - Failed to push order update to atlas - " + res.msg)
