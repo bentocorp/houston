@@ -61,6 +61,8 @@ public class Order<T> {
 
     public String phone;
 
+    public Long pk_User;
+
     public final T item;
 
     // This public field is a JSON placeholder for what will show in the Driver App. The string is constructed in the

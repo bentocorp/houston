@@ -369,11 +369,15 @@ class HttpController {
           // If unassigning an unassigned order, return success right away
           return success("OK")
         }
-        // unassign order
+
+        // Unassign order
         val cd = order.getDriverId
         val unassignedOrder = orderManager.unassign(orderId, token)
+
+        // Tell the driver
         send(OrderAction.make(OrderAction.Type.UNASSIGN, unassignedOrder, null, null).from("houston").toRecipient("d-" + cd))
         unassignedOrder
+
       } else if (order.getDriverId == driverId) {
         // TODO - Dragging a rejected order into the driver name should unassign then reassign (not reprioritize)
         // reprioritize
@@ -387,10 +391,19 @@ class HttpController {
       // Publish to all other atlas instances
       // TODO - OrderAction.Type doesn't matter to atlas?
 
+      // Send to Atlas
       val res = send(OrderAction.make(OrderAction.Type.ASSIGN, modifiedOrder, driverId, afterId).rid(rid).from("houston").toGroup("atlas"))
+
+      // Send to consumer app
+      val res2 = send(OrderAction.make(OrderAction.Type.ASSIGN, modifiedOrder, driverId, afterId).from("houston").toRecipient("c-" + order.pk_User)
+
       if (res.code != 0) {
         Logger.debug("Warning - Failed to push order update to atlas - " + res.msg)
       }
+      if (res2.code != 0) {
+        Logger.debug("Warning - Failed to push order update to consumer app! - " + res.msg)
+      }
+
       success("OK")
     } catch {
       case e: Exception =>
@@ -440,6 +453,13 @@ class HttpController {
     }
   }
 
+  /**
+    * The driver has accepted the order
+    *
+    * @param orderId
+    * @param token
+      * @return
+      */
   @RequestMapping(Array("/order/accept"))
   def orderAccept(@RequestParam("orderId") orderId: String, @RequestParam("token") token: String) = {
     try {
@@ -449,9 +469,17 @@ class HttpController {
       if (orderDriverId != actingDriverId) {
         throw new Exception("Error - This order is assigned to a different driver (%s)" format orderDriverId)
       }
-      val order = orderManager.updateStatus(orderId, Order.Status.ACCEPTED)
+      val order :Order[_] = orderManager.updateStatus(orderId, Order.Status.ACCEPTED)
       val push = OrderStatus.make(orderId, Order.Status.ACCEPTED).from("houston").toGroup("atlas")
+
+      // Send a push to Atlas
       send(push)
+
+      // Send a push to the customer
+      // Need, driverId, customerId, orderId
+      val customerPush = new Push[Order[_]]("order_status_accepted", order).from("houston").toRecipient("c-" + order.pk_User)
+      send(customerPush)
+
       // Let the customer know that a driver is on the way
       val greeting = {
         if (order.firstName != null && !order.firstName.isEmpty) {
@@ -529,10 +557,15 @@ class HttpController {
       if (orderDriverId != actingDriverId) {
         throw new Exception("Error - This order is assigned to a different driver (%s)" format orderDriverId)
       }
-      orderManager.updateStatus(orderId, Order.Status.COMPLETE)
+      val order = orderManager.updateStatus(orderId, Order.Status.COMPLETE)
       driverManager.removeOrder(driverId, orderId)
       val push = OrderStatus.make(orderId, Order.Status.COMPLETE).from("houston").toGroup("atlas")
       send(push)
+
+      // Send a push to the customer app
+      val customerPush = new Push[Order[_]]("order_status_complete", order).from("houston").toRecipient("c-" + order.pk_User)
+      send(customerPush)
+
       success("OK")
     } catch {
       case e: Exception => error(1, e.getMessage)

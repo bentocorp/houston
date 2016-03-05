@@ -52,7 +52,7 @@ class TOrder(tag: Tag) extends Table[(Long, Option[Long], Option[Timestamp], Opt
 
 object OrderDao {
     type CompleteOrderRow = (Long, Option[Timestamp], Option[String], Option[String], Option[String], Option[String], Option[String], /*Some(city), Some(state),*/
-            Option[String], Option[String], Option[String], Option[Long], Option[Long], Option[Long], Option[Long], Option[Long], Option[String],
+            Option[String], Long, Option[String], Option[Long], Option[Long], Option[Long], Option[Long], Option[Long], Option[String],
             Option[Long], Option[String], Option[String], Option[Int], Option[Timestamp], Option[Timestamp])
 }
 
@@ -91,8 +91,9 @@ class OrderDao extends Updatable("Order") {
                 //      o.city, // Ignore city for now (always San Francisco) to avoid limit
                 //      o.state, // Ignore state for now (always California) to avoid limit
                 o.zip,
-                o.lat,
-                o.long,
+                u.pk_User,
+                o.lat ++ "," ++ o.long,
+                //o.long,
                 b.fk_main,
                 b.fk_side1,
                 b.fk_side2,
