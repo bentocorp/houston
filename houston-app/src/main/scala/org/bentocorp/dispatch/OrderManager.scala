@@ -235,7 +235,6 @@ class OrderManager {
                 }
                 else {
                     Logger.error(s"Addon ${value.printPkOrderItem()} for Order ${key}, for range ${scheduledWindowStart} - ${scheduledWindowEnd}, was not found in the order.")
-                    Logger.error(Thread.currentThread().getStackTrace().mkString("\n"))
                 }
         }
 

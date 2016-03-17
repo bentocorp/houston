@@ -403,7 +403,7 @@ class OrderAheadController {
         } catch {
             case e: Exception => // Catch all Exceptions
                 // Log the error
-                logger.error(e.getMessage, e)
+                logger.error("Error in OrderAheadController.assign() - " + e.getMessage, e)
                 // Forward the error to the front-end (Atlas)
                 error(1, e.getMessage)
         } finally {
