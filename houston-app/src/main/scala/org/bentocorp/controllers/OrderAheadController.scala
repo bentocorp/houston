@@ -511,7 +511,7 @@ class OrderAheadController {
         } catch {
             case e: Exception => model.put("error", ExceptionUtils.getStackTrace(e))
         }
-        println(model);
+        logger.debug(ScalaJson.stringify(model));
         new ModelAndView("report", model)
     }
 
