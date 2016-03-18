@@ -167,7 +167,7 @@ class OrderAheadController {
 
                 val redisKey = _redisKeySchedule(j_.date, j_.shift.ordinal())
 
-                println("SET " + redisKey)
+                logger.debug("OrderAheadController.checkAndPersist - SET " + redisKey)
                 res0 = redisConnection.sync(
                     StringCodec.INSTANCE, RedisCommands.SET, redisKey, ScalaJson.stringify(job))
             }
@@ -236,7 +236,7 @@ class OrderAheadController {
         try {
             redisConnection = redis.connect(6)
             val redisKey = _redisKeySchedule(dateStr, shiftValue) // "routific-schedule_01/26/2016-0"
-            println("GET " + redisKey)
+            logger.debug("GET " + redisKey)
             val res0: String = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.GET, redisKey)
 
             if (res0 != null) {
