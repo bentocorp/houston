@@ -324,9 +324,9 @@ class OrderAheadController {
                 calendar.get(Calendar.DAY_OF_MONTH)
             )
             val cShift = Shift.getShiftEqualToOrGreaterThan(System.currentTimeMillis())
-            if (cLocalDate.format(LOCAL_DATE_FORMAT) != dateStr || cShift.ordinal() != shiftValue) {
-                throw new Exception("Sorry can only assign to this work period")
-            }
+//            if (cLocalDate.format(LOCAL_DATE_FORMAT) != dateStr || cShift.ordinal() != shiftValue) {
+//                throw new Exception("Sorry can only assign to this work period")
+//            }
 
             // Even if the job is successful, we have to make sure that it is up-to-date. Fetch all Order Ahead orders
             // from the database and see if they are all included in the job.
