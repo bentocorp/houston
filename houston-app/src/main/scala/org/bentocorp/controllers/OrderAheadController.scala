@@ -236,7 +236,7 @@ class OrderAheadController {
         try {
             redisConnection = redis.connect(6)
             val redisKey = _redisKeySchedule(dateStr, shiftValue) // "routific-schedule_01/26/2016-0"
-            logger.debug("GET " + redisKey)
+            logger.debug("GET " + redisKey )
             val res0: String = redisConnection.sync(StringCodec.INSTANCE, RedisCommands.GET, redisKey)
 
             if (res0 != null) {
