@@ -150,8 +150,8 @@ class OrderManager {
         //   b) So that we can persist the data in Redis to be shared globally by multiple Houston instances
         val orders = MMap[Long, Order[Bento]]()
         rows foreach {
-            case (orderId, Some(createdAt), Some(firstname), Some(lastname), Some(phone), Some(street), scheduledTimeZoneOpt, /*Some(city), Some(state),*/
-            zipCodeOpt, pk_User, Some(latLng), mainOpt, side1Opt, side2Opt, side3Opt, side4Opt, Some(statusStr),
+            case (orderId, Some(createdAt), Some(firstname), Some(lastname), Some(phone), Some(street), scheduledTimeZoneOpt,
+            /*Some(city), Some(state), zipCodeOpt,*/ Some(cityStateZip), pk_User, Some(latLng), mainOpt, side1Opt, side2Opt, side3Opt, side4Opt, Some(statusStr),
             driverIdOpt, notesOpt, Some(driverTextBlob), Some(orderType), scheduledWindowStartOpt, scheduledWindowEndOpt) =>
                 val status = Order.Status.parse(statusStr)
                 if (status == Order.Status.CANCELLED) {
@@ -162,10 +162,14 @@ class OrderManager {
                             case Some(existingOrder) => existingOrder
                             case _ =>
                                 // TODO - Create country enums?
-                                val address = new Address(street.trim(), null, "San Francisco", "California", zipCodeOpt.getOrElse(""), "United States")
+                                val addressParts = cityStateZip.split(",").map(_.trim)
+                                val address = new Address(street.trim(), null, addressParts(0), "California", addressParts(2), "United States")
+                                //val address = new Address(street.trim(), null, "San Francisco", "California", zipCodeOpt.getOrElse(""), "United States")
+
                                 val latLngParts = latLng.split(",")
                                 address.lat = latLngParts(0).toFloat
                                 address.lng = latLngParts(1).toFloat
+
                                 val newOrder = new Order[Bento]("o-" + orderId, firstname, lastname, PhoneUtils.normalize(phone), address, new Bento)
                                 val driverId = if (driverIdOpt.isDefined && driverIdOpt.get > 0) new java.lang.Long(driverIdOpt.get) else null
                                 newOrder.setDriverIdWithStatus(driverId, status)

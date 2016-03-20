@@ -90,7 +90,8 @@ class OrderDao extends Updatable("Order") {
                 o.scheduled_timezone,
                 //      o.city, // Ignore city for now (always San Francisco) to avoid limit
                 //      o.state, // Ignore state for now (always California) to avoid limit
-                o.zip,
+                o.city ++ "," ++ o.state ++ "," ++ o.zip,
+                //o.zip,
                 u.pk_User,
                 o.lat ++ "," ++ o.long,
                 //o.long,
