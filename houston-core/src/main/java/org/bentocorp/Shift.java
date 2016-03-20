@@ -9,7 +9,7 @@ import java.util.TimeZone;
 public enum Shift {
 
     // Hours & minutes in PST (-08:00)
-    LUNCH (LocalTime.of(10, 0), LocalTime.of(14, 0)),
+    LUNCH (LocalTime.of(10, 0), LocalTime.of(15, 0)),
     DINNER(LocalTime.of(17, 0), LocalTime.of(22, 0));
 
     // Shift.Type mainly used to describe what type of work a driver is scheduled for
