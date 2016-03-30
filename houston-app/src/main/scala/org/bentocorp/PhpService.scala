@@ -90,12 +90,12 @@ class PhpService {
     val normalizedAfterId = if (afterId == null) "-1" else afterId;
 
     val url = "https://%s/adminapi/order/assign/%s/%s/%s?api_token=%s".format(
-      phpUrl,orderId, driverId, normalizedAfterId, URLEncoder.encode(token, "UTF-8"))
+    phpUrl,orderId, driverId, normalizedAfterId, URLEncoder.encode(token, "UTF-8"))
     Logger.debug(url)
     val request = new HttpGet(url)
     val config = RequestConfig.custom()
-                              .setConnectTimeout(1000)
-                              .setConnectionRequestTimeout(1000)
+                              .setConnectTimeout(10000)
+                              .setConnectionRequestTimeout(10000)
                               .build()
     request.setConfig(config)
     try {
