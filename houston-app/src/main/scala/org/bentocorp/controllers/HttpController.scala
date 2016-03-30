@@ -407,7 +407,8 @@ class HttpController {
       success("OK")
     } catch {
       case e: Exception =>
-        e.printStackTrace()
+        //e.printStackTrace()
+        Logger.error("Error assigning: ", e);
         error(1, e.getMessage)
     }
   }
