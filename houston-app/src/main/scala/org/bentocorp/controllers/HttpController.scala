@@ -346,6 +346,8 @@ class HttpController {
              @RequestParam(value = "driverId") driverId: java.lang.Long,
              @RequestParam(value = "afterId" ) afterId : String): String = {
     try {
+      error(1, "Assigning order: " + orderId + " to driver " + driverId)
+
       // protect against deprecated assignment format
       if ("-1".equals(afterId)) {
         return error(1, "Old order assignment format. Parameter \"afterId\" cannot be -1")
