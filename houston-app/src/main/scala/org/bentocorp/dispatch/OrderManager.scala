@@ -513,7 +513,8 @@ class OrderManager {
             "zip" -> order.address.zipCode,
             "lat" -> order.address.lat.toString,
             "long" -> order.address.lng.toString,
-            "notes_for_driver" -> order.notes
+            "notes_for_driver" -> order.notes,
+            "driver_text_blob" -> order.orderString
         )
 
         // Try updating the database first. Then, if successful, set to cache.

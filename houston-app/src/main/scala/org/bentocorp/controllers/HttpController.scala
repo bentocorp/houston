@@ -23,7 +23,7 @@ import org.bentocorp.houston.util.{HttpUtils, PhoneUtils}
 import org.bentocorp.redis.Redis
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.web.bind.annotation.{RequestMapping, RequestParam, RestController}
+import org.springframework.web.bind.annotation._
 
 import scala.collection.JavaConversions._
 
@@ -271,7 +271,7 @@ class HttpController {
   }
   */
 
-  @RequestMapping(Array("/order/update"))
+  @RequestMapping(value=Array("/order/update"),method=Array(RequestMethod.POST))
   def updateOrder(@RequestParam(value = "rid", defaultValue = "") rid: String,
                   @RequestParam(value = "orderId") orderId: String,
 //                  @RequestParam(value = "firstName", defaultValue = "") firstName: String,
@@ -284,7 +284,8 @@ class HttpController {
 //                  @RequestParam(value = "country"  , defaultValue = "") country  : String,
                   @RequestParam(value = "lat"      , defaultValue = "") lat      : String,
                   @RequestParam(value = "lng"      , defaultValue = "") lng      : String,
-                  @RequestParam(value = "notes"    , defaultValue = "") notes    : String): String = {
+                  @RequestParam(value = "notes"    , defaultValue = "") notes    : String,
+                  @RequestParam(value = "blob"     , defaultValue = "") blob     : String): String = {
     try {
       val order = orderManager.getOrder(orderId)
 
@@ -304,6 +305,7 @@ class HttpController {
       if (valid(      lat)) order.address.lat     = lat.toFloat
       if (valid(      lng)) order.address.lng     = lng.toFloat
       if (valid(    notes)) order.notes     = notes
+      if (valid(blob)) order.orderString = blob
 
       orderManager.update(order)
       send(OrderAction.make(OrderAction.Type.MODIFY, order, -1l, null).rid(rid).from("houston").toGroup("atlas"))
@@ -394,7 +396,7 @@ class HttpController {
       success("OK")
     } catch {
       case e: Exception =>
-        e.printStackTrace()
+        Logger.error(e.getMessage, e)
         error(1, e.getMessage)
     }
   }
@@ -669,4 +671,42 @@ class HttpController {
       case e: Exception => Logger.error(e.getMessage, e); error(1, e.getMessage)
     }
   }
+
+    @RequestMapping(Array("/driver/swap"))
+    @ResponseBody
+    def swap(@RequestParam("token") token: String,
+             @RequestParam("driverId1") driverId1: Long,
+             @RequestParam("driverId2") driverId2: Long): String =  {
+        try {
+            if (driverId1 != driverId2) {
+                val driver1 = driverManager.getDriver(driverId1)
+                val driver2 = driverManager.getDriver(driverId2)
+                if (driver1.shiftType != driver2.shiftType) {
+                  throw new RuntimeException("Incompatible shift types")
+                }
+
+                val orderQueue1 = driver1.getOrderQueue
+                val orderQueue2 = driver2.getOrderQueue
+
+                orderQueue1 foreach { orderId =>
+                  assign(token, null, orderId, null, null)
+                }
+
+                orderQueue2 foreach { orderId =>
+                  assign(token, null, orderId, null, null)
+                }
+
+                orderQueue1 foreach { orderId =>
+                  assign(token, null, orderId, driverId2, null)
+                }
+
+                orderQueue2 foreach { orderId =>
+                  assign(token, null, orderId, driverId1, null)
+                }
+            }
+            success(0, "OK")
+        } catch {
+            case e: Exception => Logger.error(e.getMessage, e); error(1, e.getMessage)
+        }
+    }
 }

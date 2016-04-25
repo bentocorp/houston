@@ -416,7 +416,7 @@ class OrderAheadController {
 
         val model = new util.HashMap[String, Any]()
         try {
-            val orders = _getOrderAheadOrders(dateStr, shiftValue)
+            val orders: MMap[Long, Order[Bento]] = _getOrderAheadOrders(dateStr, shiftValue)
             val job = _getMostRecentJob(dateStr, shiftValue) match {
                 case Some(v) =>
                     v
@@ -436,20 +436,24 @@ class OrderAheadController {
                 val inventories = new util.HashMap[String, DriverInventory]()
 
                 var count = 0
-                job.output.solution foreach {
+                val drivers = driverManager.drivers.toMap.values.filter(_.shiftType == Shift.Type.ORDER_AHEAD)
+                drivers foreach { driver => /*job.output.solution foreach {
                     case (driverId, visits) =>
                         //
-                        val driver = driverManager.getDriver(driverId.toLong)
-                        inventories.put(driverId, new DriverInventory(driver.name))
+                        val driver = driverManager.getDriver(driverId.toLong)*/
+                        inventories.put(driver.id + "", new DriverInventory(driver.name))
 
                         val dishes0 = new util.HashMap[BentoBox.Item, Int]()
                         val addons0 = new util.HashMap[AddOnList.AddOn, Int]()
                         // For each visit (order)
-                        (1 until visits.size) foreach { i =>
+                        driver.getOrderQueue foreach { orderId => //(1 until visits.size) foreach { i =>
                             count = count + 1
-                            val v = visits(i)
+//                            val v = visits(i)
                             // Retrieve the order from cache
-                            val order = orders(v.id.toLong) // Throws Exception if order doesn't exist
+
+                            // This will throw a ClassCastException if order is generic.
+                            // Hack: Catch the exception for now (proper way is to use manifest to overcome type erasure)
+                            try { val order = orders(orderId.split("-")(1).toLong)//orders(v.id.toLong) // Throws Exception if order doesn't exist
                             order.item foreach {
                                 case wrapper: BentoBox =>
                                     wrapper.items foreach { dish =>
@@ -466,10 +470,10 @@ class OrderAheadController {
                                         }
                                         addons0.put(addon, addons0.get(addon) + addon.qty)
                                     }
-                            }
+                            } } catch { case e: NoSuchElementException => }
                         }
-                        dishes.put(driverId, dishes0)
-                        addons.put(driverId, addons0)
+                        dishes.put(driver.id + ""/*driverId*/, dishes0)
+                        addons.put(driver.id + ""/*driverId*/, addons0)
                 }
 
                 dishes foreach {

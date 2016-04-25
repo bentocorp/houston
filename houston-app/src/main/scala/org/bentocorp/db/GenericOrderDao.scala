@@ -182,4 +182,14 @@ class GenericOrderDao extends Updatable("generic_Order") {
       if (con != null) con.close()
     }
   }
+
+  override def update(pk: Long, cols: Map[String, String]): Int = {
+    database() withSession { implicit session =>
+      val row = for { o <- genericOrders if o.pk_generic_Order === pk } yield o.body
+      row.update(Some(cols("driver_text_blob")))
+    }
+    val cols2 = cols - "driver_text_blob"
+    super.update(pk, cols2)
+  }
+
 }
