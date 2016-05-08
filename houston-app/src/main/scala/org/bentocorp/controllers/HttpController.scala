@@ -490,7 +490,7 @@ class HttpController {
             30 // Default to 30 minutes
         }
         */
-      val msg = greeting + "Your Bento server is about 15-25 minutes away. You’ll receive another text message shortly when they arrive."
+      val msg = greeting + "Your Bento server is on the way! Check the app for your server’s current location. You’ll receive another text message shortly when they arrive."
       smsSender.send(order.phone, msg)
       success("OK")
     } catch {
